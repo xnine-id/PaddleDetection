@@ -133,13 +133,88 @@ class PushStream(object):
         # 自行设置
         self.pushurl = pushurl
 
+    def has_nvenc(self):
+        result = sp.run(
+            ["ffmpeg", "-encoders"],
+            stdout=sp.PIPE,
+            stderr=sp.PIPE,
+            text=True
+        )
+        return "h264_nvenc" in result.stdout
+
+    # # Default
+    # def initcmd(self, fps, width, height):
+    #     self.command = [
+    #         'ffmpeg', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo', '-pix_fmt',
+    #         'bgr24', '-s', "{}x{}".format(width, height), '-r', str(fps), '-i',
+    #         '-', '-pix_fmt', 'yuv420p', '-f', 'rtsp', self.pushurl
+    #     ]
+    #     self.pipe = sp.Popen(self.command, stdin=sp.PIPE)
+        
+    # RTSP
     def initcmd(self, fps, width, height):
-        self.command = [
-            'ffmpeg', '-y', '-f', 'rawvideo', '-vcodec', 'rawvideo', '-pix_fmt',
-            'bgr24', '-s', "{}x{}".format(width, height), '-r', str(fps), '-i',
-            '-', '-pix_fmt', 'yuv420p', '-f', 'rtsp', self.pushurl
+        encoder = [
+            '-b:v', '2M',
+            '-maxrate', '2M',
+            '-bufsize', '1M'
         ]
+
+        if self.has_nvenc():
+            print("Using GPU encoder (NVENC)")
+            encoder.extend([
+                '-c:v', 'h264_nvenc',
+                '-preset', 'p1',
+                '-tune', 'ull',
+                '-g', str(fps),
+            ])
+        else:
+            print("Using CPU encoder (libx264)")
+            encoder.extend([
+                '-c:v', 'libx264',
+                '-preset', 'ultrafast',
+                '-tune', 'zerolatency',
+            ])
+
+        self.command = [
+            'ffmpeg', '-y',
+            '-f', 'rawvideo',
+            '-pix_fmt', 'bgr24',
+            '-s', f"{width}x{height}",
+            '-r', str(fps),
+            '-i', '-',
+            *encoder,
+            '-pix_fmt', 'yuv420p',
+            '-rtsp_transport', 'tcp',
+            '-f', 'rtsp',
+            self.pushurl
+        ]
+
         self.pipe = sp.Popen(self.command, stdin=sp.PIPE)
+
+    # RTMP
+    # def initcmd(self, fps, width, height):
+    #     self.command = [
+    #         'ffmpeg',
+    #         '-y',
+    #         '-f', 'rawvideo',
+    #         '-vcodec', 'rawvideo',
+    #         '-pix_fmt', 'bgr24',
+    #         '-s', "{}x{}".format(width, height),
+    #         '-r', str(fps),
+    #         '-i', '-',
+
+    #         # encode ke h264
+    #         '-c:v', 'libx264',
+    #         '-preset', 'veryfast',
+    #         '-tune', 'zerolatency',
+    #         '-pix_fmt', 'yuv420p',
+
+    #         # RTMP wajib flv container
+    #         '-f', 'flv',
+    #         self.pushurl
+    #     ]
+
+    #     self.pipe = sp.Popen(self.command, stdin=sp.PIPE)
 
 
 def get_test_images(infer_dir, infer_img):

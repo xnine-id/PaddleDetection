@@ -734,7 +734,9 @@ class PipePredictor(object):
         thread.start()
         time.sleep(1)
 
-        while (not framequeue.empty()):
+        isRtsp = type(video_file) == str and "rtsp" in video_file
+
+        while (not framequeue.empty() or isRtsp):
             if frame_id % 10 == 0:
                 print('Thread: {}; frame id: {}'.format(thread_idx, frame_id))
 
@@ -975,7 +977,7 @@ class PipePredictor(object):
                 frame_len = self.cfg["VIDEO_ACTION"]["frame_len"]
                 sample_freq = self.cfg["VIDEO_ACTION"]["sample_freq"]
 
-                if sample_freq * frame_len > frame_count:  # video is too short
+                if not isRtsp and sample_freq * frame_len > frame_count:  # video is too short
                     sample_freq = int(frame_count / frame_len)
 
                 # filter the warmup frames
