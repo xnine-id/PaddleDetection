@@ -1,0 +1,20 @@
+paddle_detection:
+  script_path: "/home/jeremyjfn/app/fighting-detection/PaddleDetection/PaddleDetection/deploy/pipeline/pipeline.py"
+  config_path: "/home/jeremyjfn/app/fighting-detection/PaddleDetection/PaddleDetection/deploy/pipeline/config/infer_cfg_pphuman.yml"
+  device: gpu
+  pushurl_prefix: rtsp://localhost:8554/fight/output
+
+cameras:
+  - name: "webcam1"
+    url: "rtsp://localhost:8554/input/webcam1"
+    enabled: true
+
+snapshot:
+  enabled: false
+  output_dir: '/home/jeremyjfn/app/fighting-detection/PaddleDetection/storage/private/snapshots'
+
+mqtt:
+  enabled: true
+  event_topic_prefix: "fightdetection/events" # publish fight event
+  command_topic_prefix: "fightdetection/cmd" # enable/disable. ex: fightdetection/cmd/webcam1 {"run": true/false}
+  state_topic_prefix: "fightdetection/state" # camera state. ex: fightdetection/state/webcam1 true
