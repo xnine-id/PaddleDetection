@@ -1,3 +1,6 @@
-/venv/
 .env
+# *.pyc
+*.log
+/venv/
 storage/
+# __pycache__/

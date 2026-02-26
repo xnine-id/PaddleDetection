@@ -1,14 +1,16 @@
 import threading
 from typing import Dict, Any, List, Optional
 import logging
-from internal.processor.camera_processor import CameraProcessor
+from internal.core.fight_detector import FightDetector
+from internal.core.camera_processor import CameraProcessor
 from internal.service.mqtt_service import MQTTService
 
 logger = logging.getLogger("CameraManager")
 
 class CameraManager:
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, fight_detector: FightDetector, config: Dict[str, Any]):
         self.config = config
+        self.fight_detector = fight_detector
         self.mqtt_service: Optional[MQTTService] = None
 
         if self.config.get('mqtt', {}).get('enabled', False):
@@ -27,6 +29,7 @@ class CameraManager:
                 cam_config=cam,
                 snapshot_config=snapshot_config,
                 pd_config=pd_config,
+                fight_detector=self.fight_detector,
                 mqtt_service=self.mqtt_service,
                 thread_idx=idx,
                 stop_event=self.stop_event,
@@ -54,7 +57,10 @@ class CameraManager:
         """Stop all processors and cleanup"""
         self.stop_event.set()
         logger.info("Stopping system...")
-        
+
+        for processor in self.camera_processors.values():
+            processor.stop()
+
         # Wait for all threads to finish with timeout
         try:
             for thread in self.threads:

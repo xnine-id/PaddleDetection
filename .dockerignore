@@ -1,0 +1,17 @@
+.env
+*.pyc
+*.log
+docker/
+venv/
+storage/
+configs/
+__pycache__/
+.git/
+
+PaddleDetection/docs/
+PaddleDetection/demo/
+PaddleDetection/input/
+PaddleDetection/output/
+PaddleDetection/industrial_tutorial/
+PaddleDetection/ISSUE_TEMPLATE/
+PaddleDetection/paddledet.egg-info/

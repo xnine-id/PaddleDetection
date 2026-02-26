@@ -264,7 +264,9 @@ class PipePredictor(object):
             default as False
     """
 
-    def __init__(self, args, cfg, is_video=True, multi_camera=False):
+    def __init__(self, args, cfg, is_video=True, multi_camera=False, fight_tracker=None):
+        self.fight_tracker = fight_tracker
+
         # general module for pphuman and ppvehicle
         self.with_mot = cfg.get('MOT', False)['enable'] if cfg.get(
             'MOT', False) else False
@@ -741,7 +743,8 @@ class PipePredictor(object):
 
         while (not framequeue.empty() or isRtsp):
             if frame_id % 10 == 0:
-                print('Thread: {}; frame id: {}'.format(thread_idx, frame_id))
+                # print('Thread: {}; frame id: {}'.format(thread_idx, frame_id))
+                pass
 
             frame_rgb = framequeue.get()
             if frame_id > self.warmup_frame:
@@ -768,8 +771,9 @@ class PipePredictor(object):
                     self.pipe_timer.track_num += len(mot_res['boxes'])
 
                 if frame_id % 10 == 0:
-                    print("Thread: {}; trackid number: {}".format(
-                        thread_idx, len(mot_res['boxes'])))
+                    # print("Thread: {}; trackid number: {}".format(
+                    #     thread_idx, len(mot_res['boxes'])))
+                    pass
 
                 # flow_statistic only support single class MOT
                 boxes, scores, ids = res[0]  # batch size = 1 in MOT
@@ -975,6 +979,7 @@ class PipePredictor(object):
                 else:
                     self.pipeline_res.clear('reid')
 
+            is_update_video_action = False
             if self.with_video_action:
                 # get the params
                 frame_len = self.cfg["VIDEO_ACTION"]["frame_len"]
@@ -1002,6 +1007,7 @@ class PipePredictor(object):
 
                     video_action_res = {"class": classes[0], "score": scores[0]}
                     self.pipeline_res.update(video_action_res, 'video_action')
+                    is_update_video_action = True
 
                     print("video_action_res:", video_action_res)
 
@@ -1085,6 +1091,13 @@ class PipePredictor(object):
                                           entrance, records, center_traj,
                                           self.illegal_parking_time != -1,
                                           illegal_parking_dict)  # visualize
+
+                # For snapshot
+                if(is_update_video_action):
+                    is_update_video_action = False
+                    video_action_res = self.pipeline_res.get('video_action')
+                    self.fight_tracker.update(video_action_res, im)
+
                 if len(self.pushurl) > 0:
                     pushstream.pipe.stdin.write(im.tobytes())
                 else:

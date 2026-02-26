@@ -1,0 +1,28 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    env_file:
+      - .env
+    environment:
+      MQTT_HOST: mqtt
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    networks:
+      - default
+      - deepface_default
+    volumes:
+      - ./configs/docker_config.yml:/app/configs/config.yml:ro
+      - ./storage:/app/storage:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, compute, utility]
+
+networks:
+  deepface_default:
+    external: true

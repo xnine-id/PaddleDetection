@@ -9,9 +9,10 @@ load_dotenv()
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from internal.core.fight_detector import FightDetector
+from internal.core.camera_manager import CameraManager
 from internal.utils.logging_utils import setup_logging
 from internal.utils.config_loader import load_config
-from internal.manager.camera_manager import CameraManager
 
 logger = logging.getLogger("Main")
 
@@ -26,7 +27,11 @@ def main():
 
     config = load_config(config_path)
 
-    manager = CameraManager(config)
+    fight_detector = FightDetector(
+        cfg_path=config['paddle_detection']['config_path'],
+        device=config['paddle_detection']["device"],
+    )
+    manager = CameraManager(fight_detector, config)
     manager.start()
 
     stop_event = threading.Event()

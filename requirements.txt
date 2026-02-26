@@ -26,3 +26,6 @@ imgaug>=0.4.0
 
 python-dotenv==1.2.1
 paho-mqtt==2.1.0
+fastapi==0.133.0
+uvicorn==0.41.0
+python-multipart==0.0.22

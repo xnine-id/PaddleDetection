@@ -2,6 +2,7 @@ import json
 import os
 import logging
 from datetime import datetime
+from typing import Optional
 from paho.mqtt import client as mqtt
 
 logger = logging.getLogger("MQTT")
@@ -57,10 +58,7 @@ class MQTTService:
             topic = msg.topic
             payload = json.loads(msg.payload.decode())
             
-            if topic == self.system_topic:
-                for callback in self.system_callbacks:
-                    callback(payload)
-            elif topic.startswith(self.cmd_prefix):
+            if topic.startswith(self.cmd_prefix):
                 cam_name = topic.replace(f"{self.cmd_prefix}/", "")
                 if cam_name in self.command_callbacks:
                     self.command_callbacks[cam_name](payload)
@@ -75,7 +73,7 @@ class MQTTService:
             # Publish initial state (True by default)
             self.publish_state(cam_name, state)
 
-    def publish_event(self, event_id: str, cam_name: str, confidence: float):
+    def publish_event(self, event_id: str, cam_name: str, confidence: float, snapshot: Optional[str]):
         """Publish detection event"""
         if not self.client: return
         
@@ -83,7 +81,8 @@ class MQTTService:
             "event_id": event_id,
             "camera": cam_name,
             "confidence": round(confidence, 2),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "snapshot": snapshot,
         }
         
         topic = f"{self.event_topic}/{cam_name}"
