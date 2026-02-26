@@ -3,6 +3,7 @@ import os
 import tempfile
 import shutil
 import uuid
+import subprocess
 from fastapi import APIRouter, HTTPException, UploadFile, File, status
 from fastapi.responses import FileResponse, JSONResponse
 from internal.core.fight_detector import FightDetector
@@ -69,15 +70,36 @@ def create_router(fight_detector: FightDetector, config: dict = None):
             predictor.run(input_path, thread_idx=0)
 
             # Determine output file path
-            base_name = os.path.splitext(os.path.basename(input_path))[0]
+            output_filename = f"{basename}{ext}"
+            output_path = os.path.join(output_dir, output_filename)
+
+            # 3.1 Convert to H.264 using FFmpeg (mp4v codec is not supported by browsers)
+            h264_filename = f"h264_{output_filename}"
+            h264_path = os.path.join(output_dir, h264_filename)
+
+            logger.debug(f"Converting video to H.264: {output_path} -> {h264_path}")
+
+            try:
+                ffmpeg_cmd = [
+                    "ffmpeg", "-y", "-i", output_path,
+                    "-vcodec", "libx264", "-acodec", "aac",
+                    "-pix_fmt", "yuv420p", "-movflags", "faststart",
+                    h264_path
+                ]
+                subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                # If conversion success, use the h264 file
+                output_filename = h264_filename
+            except Exception as e:
+                logger.error(f"FFmpeg conversion failed: {str(e)}. Using original file instead.")
+                # If conversion fails, we'll try to proceed with the original file
 
             # Compute avg score from fight tracker
             avg_score = fight_tracker.get_avg_scores()
 
-            url = f"/api/videos/{base_name}{ext}"
+            url = f"/api/videos/{output_filename}"
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
-                content={"url": url, "score": avg_score}
+                content={"data": {"url": url, "score": avg_score}}
             )
         except HTTPException:
             raise
