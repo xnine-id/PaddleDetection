@@ -3,6 +3,7 @@ paddle_detection:
   config_path: "/app/PaddleDetection/deploy/pipeline/config/infer_cfg_pphuman.yml"
   device: gpu
   pushurl_prefix: rtsp://mediamtx:8554/fight
+  output_dir: '/app/PaddleDetection/storage/private/output'
 
 cameras:
   - name: "webcam1"
