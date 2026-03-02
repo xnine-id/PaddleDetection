@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 import logging
 import os
 import sys
@@ -36,19 +37,20 @@ def create_app():
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         try:
-            # Startup
-            manager.start()
-            
+            # Create a task for manager.start to avoid blocking startup
+            # if it takes too long to initialize cameras or models
+            start_task = asyncio.create_task(asyncio.to_thread(manager.start))
+
             yield
-            
-            # Shutdown
-            manager.stop()
-        except asyncio.CancelledError:
-            pass
         except Exception as e:
             logger.error(f"Unknown error in lifespan: {e}")
         finally:
-            manager.stop()
+            # Shutdown
+            logger.info("Stopping camera manager...")
+            await asyncio.to_thread(manager.stop)
+            # Cancel start task if it's still running
+            if not start_task.done():
+                start_task.cancel()
 
     app = FastAPI(title="Fighting Detection API", lifespan=lifespan)
 

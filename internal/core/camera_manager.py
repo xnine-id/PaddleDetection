@@ -37,15 +37,19 @@ class CameraManager:
             self.camera_processors[cam['name']] = proc
 
     def start(self):
-        logger.info("Starting system...")
+        logger.info("Starting camera manager...")
 
         try:
             self._create_camera_processors()
+            logger.info(f"Created {len(self.camera_processors)} camera processors")
 
             for processor in self.camera_processors.values():
+                logger.info(f"Starting thread for camera: {processor.cam_name}")
                 thread = threading.Thread(target=processor.run, daemon=True)
                 thread.start()
                 self.threads.append(thread)
+            
+            logger.info("All camera threads started")
         except KeyboardInterrupt:
             logger.info("Ctrl+C detected. Stopping...")
             self.stop()
