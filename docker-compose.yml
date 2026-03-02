@@ -9,6 +9,8 @@ services:
       MQTT_HOST: mqtt
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility,gpu,video,graphics,display
+    ports:
+      - "${PORT}:${PORT}"
     networks:
       - default
       - deepface_default
