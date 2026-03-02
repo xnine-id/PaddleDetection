@@ -24,6 +24,8 @@ pyclipper
 # for culane data augumetation
 imgaug>=0.4.0
 
+numba==0.63.1
+scikit-learn==1.8.0
 python-dotenv==1.2.1
 paho-mqtt==2.1.0
 fastapi==0.133.0

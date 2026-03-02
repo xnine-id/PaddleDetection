@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import logging
 import os
 import sys
@@ -12,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from internal.api.routes import create_router
+from internal.core.camera_manager import CameraManager
 from internal.core.fight_detector import FightDetector
 from internal.utils.config_loader import load_config
 from internal.utils.logging_utils import setup_logging
@@ -20,10 +22,35 @@ logger = logging.getLogger("API")
 
 def create_app():
     setup_logging()
+
     # Load configuration
     config = load_config('configs/config.yml')
 
-    app = FastAPI(title="Fighting Detection API")
+    fight_detector = FightDetector(
+        cfg_path=config['paddle_detection']['config_path'],
+        device=config['paddle_detection']["device"],
+    )
+    manager = CameraManager(fight_detector, config)
+
+    # Lifespan handler
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        try:
+            # Startup
+            manager.start()
+            
+            yield
+            
+            # Shutdown
+            manager.stop()
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Unknown error in lifespan: {e}")
+        finally:
+            manager.stop()
+
+    app = FastAPI(title="Fighting Detection API", lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -33,10 +60,6 @@ def create_app():
         allow_headers=["*"],
     )
 
-    fight_detector = FightDetector(
-        cfg_path=config['paddle_detection']['config_path'],
-        device=config['paddle_detection']["device"],
-    )
     api_router = create_router(fight_detector, config)
     app.include_router(api_router, prefix="/api")
 

@@ -73,7 +73,7 @@ class MQTTService:
             # Publish initial state (True by default)
             self.publish_state(cam_name, state)
 
-    def publish_event(self, event_id: str, cam_name: str, confidence: float, snapshot: Optional[str]):
+    def publish_event(self, event_id: str, cam_name: str, confidence: float, snapshot: Optional[str]=None, event_type="fight"):
         """Publish detection event"""
         if not self.client: return
         
@@ -82,6 +82,7 @@ class MQTTService:
             "camera": cam_name,
             "confidence": round(confidence, 2),
             "timestamp": datetime.now().isoformat(),
+            "event": event_type,
             "snapshot": snapshot,
         }
         

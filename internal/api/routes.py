@@ -7,13 +7,13 @@ import subprocess
 from fastapi import APIRouter, HTTPException, UploadFile, File, status
 from fastapi.responses import FileResponse, JSONResponse
 from internal.core.fight_detector import FightDetector
-from internal.service.api_fight_tracker import ApiFightTracker
+from internal.service.video_fight_tracker import VideoFightTracker
 
 logger = logging.getLogger("API_ROUTES")
 
 def create_router(fight_detector: FightDetector, config: dict = None):
     router = APIRouter()
-
+    
     snapshot_dir = config.get('snapshot', {}).get('output_dir') if config else None
     output_dir = config.get('paddle_detection', {}).get('output_dir') if config else None
 
@@ -58,7 +58,7 @@ def create_router(fight_detector: FightDetector, config: dict = None):
             with open(input_path, "wb") as f:
                 shutil.copyfileobj(file.file, f)
 
-            fight_tracker = ApiFightTracker()
+            fight_tracker = VideoFightTracker()
 
             # Run prediction
             predictor = fight_detector.predict_video(

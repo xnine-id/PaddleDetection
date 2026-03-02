@@ -5,7 +5,7 @@ from internal.service.fight_tracker_int import FightTrackerInt
 
 logger = logging.getLogger("API_FIGHT_TRACKER")
 
-class ApiFightTracker(FightTrackerInt):
+class VideoFightTracker(FightTrackerInt):
     def __init__(self):
         self.scores: list[int] = []
 

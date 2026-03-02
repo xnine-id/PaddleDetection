@@ -667,13 +667,14 @@ class PipePredictor(object):
         frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
         print("video fps: %d, frame_count: %d" % (fps, frame_count))
 
+        writer = None
         if len(self.pushurl) > 0:
             video_out_name = 'output' if self.file_name is None else self.file_name
             pushurl = os.path.join(self.pushurl, video_out_name)
             print("the result will push stream to url:{}".format(pushurl))
             pushstream = PushStream(pushurl)
             pushstream.initcmd(fps, width, height)
-        elif self.cfg['visual']:
+        elif self.cfg['visual'] and self.output_dir:
             video_out_name = 'output' if (
                 self.file_name is None or
                 type(self.file_name) == int) else self.file_name
@@ -819,7 +820,7 @@ class PipePredictor(object):
                             entrance, records, center_traj)  # visualize
                         if len(self.pushurl) > 0:
                             pushstream.pipe.stdin.write(im.tobytes())
-                        else:
+                        elif writer:
                             writer.write(im)
                             if self.file_name is None:  # use camera_id
                                 cv2.imshow('Paddle-Pipeline', im)
@@ -1093,21 +1094,21 @@ class PipePredictor(object):
                                           illegal_parking_dict)  # visualize
 
                 # For snapshot
-                if(is_update_video_action):
+                if(is_update_video_action and self.fight_tracker):
                     is_update_video_action = False
                     video_action_res = self.pipeline_res.get('video_action')
                     self.fight_tracker.update(video_action_res, im)
 
                 if len(self.pushurl) > 0:
                     pushstream.pipe.stdin.write(im.tobytes())
-                else:
+                elif writer:
                     writer.write(im)
                     if self.file_name is None:  # use camera_id
                         cv2.imshow('Paddle-Pipeline', im)
                         if cv2.waitKey(1) & 0xFF == ord('q'):
                             break
 
-        if self.cfg['visual'] and len(self.pushurl) == 0:
+        if self.cfg['visual'] and len(self.pushurl) == 0 and writer:
             writer.release()
             print('save result to {}'.format(out_path))
 

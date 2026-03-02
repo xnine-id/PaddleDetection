@@ -4,7 +4,7 @@ from threading import Event
 from typing import Optional, Dict, Any
 
 from internal.core.fight_detector import FightDetector
-from internal.service.fight_tracker import FightTracker
+from internal.service.stream_fight_tracker import StreamFightTracker
 from internal.service.mqtt_service import MQTTService
 
 logger = logging.getLogger("CameraProcessor")
@@ -27,7 +27,7 @@ class CameraProcessor:
 
         self.mqtt_service = mqtt_service
         self.fight_detector = fight_detector
-        self.fight_tracker = FightTracker(
+        self.fight_tracker = StreamFightTracker(
             snapshot_config=snapshot_config,
             cam_name=self.cam_name, 
             mqtt_service=self.mqtt_service

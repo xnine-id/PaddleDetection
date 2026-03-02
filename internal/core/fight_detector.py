@@ -21,7 +21,7 @@ class FightDetector:
             rtsp=rtsp_url,
             camera_id=-1,
             # runtime and output
-            output_dir="output",
+            output_dir=None,
             pushurl=pushurl,
             run_mode='paddle',
             device=self.device,

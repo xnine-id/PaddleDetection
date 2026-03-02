@@ -10,7 +10,7 @@ cameras:
     enabled: true
 
 snapshot:
-  enabled: false
+  enabled: true
   output_dir: '/app/storage/private/snapshots'
 
 mqtt:

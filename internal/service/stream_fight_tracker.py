@@ -12,7 +12,7 @@ from internal.service.mqtt_service import MQTTService
 
 logger = logging.getLogger("FIGHT_TRACKER")
 
-class FightTracker(FightTrackerInt):
+class StreamFightTracker(FightTrackerInt):
     def __init__(self, snapshot_config: Dict[str, Any], cam_name: str, mqtt_service: Optional[MQTTService]):
         self.snapshot_enabled = snapshot_config['enabled']
         self.output_dir = snapshot_config['output_dir']
@@ -22,6 +22,7 @@ class FightTracker(FightTrackerInt):
         self.current_score: Optional[int] = None
         self.threshold = 5
         self.update_count = 0
+        self.event_id: Optional[str] = None
 
     def update(self, result: dict, frame):
         """Update current detections"""
@@ -33,13 +34,16 @@ class FightTracker(FightTrackerInt):
             prev_score = self.current_score
             self.current_score = result["score"]
 
-            if self.mqtt_service and prev_score == None:
+            if prev_score == None or self.event_id == None:
+                self.event_id = str(uuid.uuid4())
+
+            if self.mqtt_service:
                 snapshot = None
                 if self.snapshot_enabled and frame is not None:
                     snapshot = self._save_snapshot(frame)
 
                 self.mqtt_service.publish_event(
-                    event_id=str(uuid.uuid4()),
+                    event_id=self.event_id,
                     cam_name=self.cam_name,
                     confidence=result["score"] * 100,
                     snapshot=snapshot,
@@ -48,7 +52,17 @@ class FightTracker(FightTrackerInt):
         else:
             self.update_count += 1
             if self.update_count % self.threshold == 0:
+                prev_score = self.current_score
                 self.current_score = None
+
+                if prev_score != None:
+                    self.event_id = str(uuid.uuid4())
+                    self.mqtt_service.publish_event(
+                        event_id=self.event_id,
+                        cam_name=self.cam_name,
+                        confidence=result["score"] * 100,
+                        event_type="no_fight",
+                    )
 
     def _save_snapshot(self, frame):
         today = datetime.now().strftime("%Y-%m-%d")
