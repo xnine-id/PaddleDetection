@@ -742,12 +742,19 @@ class PipePredictor(object):
 
         isRtsp = type(video_file) == str and "rtsp" in video_file
 
-        while (not framequeue.empty() or isRtsp):
+        while (not framequeue.empty() or thread.is_alive()):
             if frame_id % 10 == 0:
                 # print('Thread: {}; frame id: {}'.format(thread_idx, frame_id))
                 pass
 
-            frame_rgb = framequeue.get()
+            try:
+                frame_rgb = framequeue.get(timeout=1)
+            except queue.Empty:
+                continue
+
+            if self.fight_tracker and hasattr(self.fight_tracker, 'heartbeat'):
+                self.fight_tracker.heartbeat()
+
             if frame_id > self.warmup_frame:
                 self.pipe_timer.total_time.start()
 

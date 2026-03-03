@@ -2,6 +2,7 @@ import logging
 import sys
 import cv2
 import uuid
+import time
 from typing import Optional, Dict, Any
 import threading
 import os
@@ -23,9 +24,15 @@ class StreamFightTracker(FightTrackerInt):
         self.threshold = 5
         self.update_count = 0
         self.event_id: Optional[str] = None
+        self.last_update_time = time.time()
+
+    def heartbeat(self):
+        """Update last update time to indicate predictor is still alive"""
+        self.last_update_time = time.time()
 
     def update(self, result: dict, frame):
         """Update current detections"""
+        self.heartbeat()
 
         logger.debug(f"[{self.cam_name}] Result: {result}")
 

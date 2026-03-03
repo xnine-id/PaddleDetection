@@ -1,5 +1,6 @@
 import logging
 import threading
+import time
 from threading import Event
 from typing import Optional, Dict, Any
 
@@ -52,36 +53,73 @@ class CameraProcessor:
                 self.stop()
 
     def run(self):
-        if not self.is_running:
-            return
-
-        self.predictor_thread = threading.Thread(target=self.predictor.run, args=(self.url, self.thread_idx), daemon=True)
-        self.predictor_thread.start()
+        """Main loop for camera processor, handles auto-reconnect and stuck detection"""
+        logger.info(f"[{self.cam_name}] Starting main loop for camera processor...")
+        
+        last_reconnect_check = time.time()
+        
+        while not self.stop_event.is_set():
+            if self.is_running:
+                # 1. Check if predictor thread is dead
+                thread_is_alive = self.predictor_thread is not None and self.predictor_thread.is_alive()
+                
+                # 2. Check if predictor is stuck (no heartbeat for > 15 seconds)
+                is_stuck = False
+                if thread_is_alive:
+                    time_since_last_update = time.time() - self.fight_tracker.last_update_time
+                    if time_since_last_update > 15:
+                        logger.warning(f"[{self.cam_name}] Predictor seems stuck (no heartbeat for {time_since_last_update:.1f}s)")
+                        is_stuck = True
+                
+                # Reconnect if dead or stuck
+                if not thread_is_alive or is_stuck:
+                    if self.predictor_thread is not None:
+                        reason = "died" if not thread_is_alive else "stuck"
+                        logger.warning(f"[{self.cam_name}] Predictor {reason}. Reconnecting...")
+                    
+                    logger.info(f"[{self.cam_name}] Connecting to camera: {self.url}")
+                    # Reset heartbeat before starting
+                    self.fight_tracker.heartbeat()
+                    
+                    self.predictor_thread = threading.Thread(
+                        target=self.predictor.run, 
+                        args=(self.url, self.thread_idx), 
+                        daemon=True
+                    )
+                    self.predictor_thread.start()
+                
+                # Sleep a bit before checking again
+                time.sleep(2)
+            else:
+                # If we are not supposed to be running, but thread is still alive, 
+                # we just wait for it to die (it should die if stream is closed or predictor returns)
+                # Note: We can't easily force-kill a thread in Python
+                time.sleep(1)
+        
+        logger.info(f"[{self.cam_name}] Main loop stopped")
 
     def start(self):
         if self.is_running:
             return
 
-        logger.info(f"[{self.cam_name}] Starting camera processor...")
-        if self.predictor_thread and self.predictor_thread.is_alive():
-            self.predictor_thread.join()
-
+        logger.info(f"[{self.cam_name}] Enabling camera processor status...")
         self.is_running = True
-        self.run()
 
         if self.mqtt_service:
             self.mqtt_service.publish_state(self.cam_name, self.is_running)
-        logger.info(f"[{self.cam_name}] Status changed to ENABLED via MQTT")
+        logger.info(f"[{self.cam_name}] Status changed to ENABLED")
 
     def stop(self):
         if not self.is_running:
             return
 
-        logger.info(f"[{self.cam_name}] Stopping camera processor...")
+        logger.info(f"[{self.cam_name}] Disabling camera processor status...")
         self.is_running = False
-        if self.predictor_thread:
-            self.predictor_thread.join()
+        
+        # Note: predictor_thread will continue until its current run() call finishes.
+        # This usually happens when the stream is closed or an error occurs.
+        # We don't join here because it might block MQTT/API response if the stream is hanging.
 
         if self.mqtt_service:
             self.mqtt_service.publish_state(self.cam_name, self.is_running)
-        logger.info(f"[{self.cam_name}] Status changed to DISABLED via MQTT")
+        logger.info(f"[{self.cam_name}] Status changed to DISABLED")
