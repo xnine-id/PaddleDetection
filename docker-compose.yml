@@ -13,9 +13,10 @@ services:
       - "${PORT}:${PORT}"
     networks:
       - default
-      - deepface_default
+      - deepface-engine_default
     volumes:
       - ./configs/docker_config.yml:/app/configs/config.yml:ro
+      - ./configs/infer_cfg_pphuman.yml:/app/configs/infer_cfg_pphuman.yml:ro
       - ./storage:/app/storage:rw
       - ./storage/private/models:/root/.cache/paddle:rw
     deploy:
@@ -27,5 +28,5 @@ services:
               capabilities: [gpu, compute, utility, video, graphics, display]
 
 networks:
-  deepface_default:
+  deepface-engine_default:
     external: true
