@@ -7,13 +7,14 @@ from internal.service.mqtt_service import MQTTService
 
 logger = logging.getLogger("CameraManager")
 
+
 class CameraManager:
     def __init__(self, fight_detector: FightDetector, config: Dict[str, Any]):
         self.config = config
         self.fight_detector = fight_detector
         self.mqtt_service: Optional[MQTTService] = None
 
-        if self.config.get('mqtt', {}).get('enabled', False):
+        if self.config.get("mqtt", {}).get("enabled", False):
             self.mqtt_service = MQTTService(self.config)
 
         self.threads: List[threading.Thread] = []
@@ -21,10 +22,10 @@ class CameraManager:
         self.stop_event = threading.Event()
 
     def _create_camera_processors(self):
-        pd_config = self.config.get('paddle_detection', {})
-        snapshot_config = self.config.get('snapshot', {})
+        pd_config = self.config.get("paddle_detection", {})
+        snapshot_config = self.config.get("snapshot", {})
 
-        for idx, cam in enumerate(self.config.get('cameras', [])):
+        for idx, cam in enumerate(self.config.get("cameras", [])):
             proc = CameraProcessor(
                 cam_config=cam,
                 snapshot_config=snapshot_config,
@@ -34,7 +35,7 @@ class CameraManager:
                 thread_idx=idx,
                 stop_event=self.stop_event,
             )
-            self.camera_processors[cam['name']] = proc
+            self.camera_processors[cam["name"]] = proc
 
     def start(self):
         logger.info("Starting camera manager...")
@@ -48,7 +49,7 @@ class CameraManager:
                 thread = threading.Thread(target=processor.run, daemon=True)
                 thread.start()
                 self.threads.append(thread)
-            
+
             logger.info("All camera threads started")
         except KeyboardInterrupt:
             logger.info("Ctrl+C detected. Stopping...")
@@ -72,15 +73,17 @@ class CameraManager:
                     # Give each thread enough time to finish (5 seconds per camera)
                     thread.join(timeout=5)
                     if thread.is_alive():
-                        logger.warning(f"Warning: Thread {thread.name} did not stop gracefully")
+                        logger.warning(
+                            f"Warning: Thread {thread.name} did not stop gracefully"
+                        )
         except KeyboardInterrupt:
             logger.warning("Force stopping (Ctrl+C during shutdown)...")
         finally:
             # Clear threads list to avoid re-joining
             self.threads.clear()
             self.camera_processors.clear()
-            
+
         if self.mqtt_service:
             self.mqtt_service.disconnect()
-            
+
         logger.info("System stopped")

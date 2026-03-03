@@ -13,10 +13,16 @@ from internal.service.mqtt_service import MQTTService
 
 logger = logging.getLogger("FIGHT_TRACKER")
 
+
 class StreamFightTracker(FightTrackerInt):
-    def __init__(self, snapshot_config: Dict[str, Any], cam_name: str, mqtt_service: Optional[MQTTService]):
-        self.snapshot_enabled = snapshot_config['enabled']
-        self.output_dir = snapshot_config['output_dir']
+    def __init__(
+        self,
+        snapshot_config: Dict[str, Any],
+        cam_name: str,
+        mqtt_service: Optional[MQTTService],
+    ):
+        self.snapshot_enabled = snapshot_config["enabled"]
+        self.output_dir = snapshot_config["output_dir"]
         self.cam_name = cam_name
         self.mqtt_service = mqtt_service
 
@@ -76,19 +82,22 @@ class StreamFightTracker(FightTrackerInt):
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
 
         """Save snapshot in a separate thread to avoid blocking"""
+
         def save_task():
             try:
                 final_output_dir = os.path.join(self.output_dir, today)
-                
+
                 os.makedirs(final_output_dir, exist_ok=True)
-                
-                final_output = os.path.join(final_output_dir, f"{self.cam_name}_{timestamp}.jpg")
+
+                final_output = os.path.join(
+                    final_output_dir, f"{self.cam_name}_{timestamp}.jpg"
+                )
                 cv2.imwrite(final_output, frame)
             except Exception as e:
                 logger.Info(f"[{self.cam_name}] Failed to save snapshot: {e}")
 
         # Run in background
         threading.Thread(target=save_task, daemon=True).start()
-        
+
         # Return path immediately (predicted path)
         return f"/snapshots/{today}/{self.cam_name}_{timestamp}.jpg"

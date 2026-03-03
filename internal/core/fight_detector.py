@@ -4,12 +4,15 @@ from PaddleDetection.deploy.pipeline.cfg_utils import merge_cfg
 from PaddleDetection.deploy.pipeline.pipeline import PipePredictor
 from internal.service.fight_tracker_int import FightTrackerInt
 
+
 class FightDetector:
     def __init__(self, cfg_path: str, device: str):
         self.cfg_path = cfg_path
         self.device = device
 
-    def predict_livestream(self, rtsp_url: str, pushurl: str, fight_tracker: FightTrackerInt):
+    def predict_livestream(
+        self, rtsp_url: str, pushurl: str, fight_tracker: FightTrackerInt
+    ):
         args = SimpleNamespace(
             # required
             config=self.cfg_path,
@@ -23,7 +26,7 @@ class FightDetector:
             # runtime and output
             output_dir=None,
             pushurl=pushurl,
-            run_mode='paddle',
+            run_mode="paddle",
             device=self.device,
             enable_mkldnn=False,
             cpu_threads=1,
@@ -35,21 +38,25 @@ class FightDetector:
             do_entrance_counting=False,
             do_break_in_counting=False,
             illegal_parking_time=-1,
-            region_type='horizontal',
+            region_type="horizontal",
             region_polygon=[],
             secs_interval=2,
             draw_center_traj=False,
             # placeholder for -o/--opt support
-            opt=None
+            opt=None,
         )
         cfg = merge_cfg(args)
-        predictor = PipePredictor(args, cfg, is_video=True, multi_camera=True, fight_tracker=fight_tracker)
+        predictor = PipePredictor(
+            args, cfg, is_video=True, multi_camera=True, fight_tracker=fight_tracker
+        )
 
-        filename = rtsp_url.split('/')[-1]
+        filename = rtsp_url.split("/")[-1]
         predictor.set_file_name(filename)
         return predictor
 
-    def predict_video(self, video_file: str, output_dir: str, fight_tracker: FightTrackerInt):
+    def predict_video(
+        self, video_file: str, output_dir: str, fight_tracker: FightTrackerInt
+    ):
         args = SimpleNamespace(
             # required
             config=self.cfg_path,
@@ -63,7 +70,7 @@ class FightDetector:
             # runtime and output
             output_dir=output_dir,
             pushurl=[],
-            run_mode='paddle',
+            run_mode="paddle",
             device=self.device,
             enable_mkldnn=False,
             cpu_threads=1,
@@ -75,16 +82,16 @@ class FightDetector:
             do_entrance_counting=False,
             do_break_in_counting=False,
             illegal_parking_time=-1,
-            region_type='horizontal',
+            region_type="horizontal",
             region_polygon=[],
             secs_interval=2,
             draw_center_traj=False,
             # placeholder for -o/--opt support
-            opt=None
+            opt=None,
         )
         cfg = merge_cfg(args)
         predictor = PipePredictor(args, cfg, is_video=True, fight_tracker=fight_tracker)
 
-        filename = video_file.split('/')[-1]
+        filename = video_file.split("/")[-1]
         predictor.set_file_name(filename)
         return predictor
