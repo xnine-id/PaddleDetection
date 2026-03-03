@@ -191,6 +191,16 @@ class PushStream(object):
 
         self.pipe = sp.Popen(self.command, stdin=sp.PIPE)
 
+    def release(self):
+        if hasattr(self, 'pipe') and self.pipe:
+            try:
+                self.pipe.stdin.close()
+                self.pipe.terminate()
+                self.pipe.wait(timeout=1)
+            except Exception:
+                self.pipe.kill()
+            self.pipe = None
+
     # RTMP
     # def initcmd(self, fps, width, height):
     #     self.command = [

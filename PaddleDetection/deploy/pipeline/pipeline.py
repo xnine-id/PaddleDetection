@@ -364,6 +364,10 @@ class PipePredictor(object):
         self.illegal_parking_time = args.illegal_parking_time
 
         self.warmup_frame = self.cfg['warmup_frame']
+        self.stop_requested = False
+        self.capture = None
+        self.capture_thread = None
+        self.pushstream = None
         self.pipeline_res = Result()
         self.pipe_timer = PipeTimer()
         self.file_name = None
@@ -642,23 +646,47 @@ class PipePredictor(object):
             if self.cfg['visual']:
                 self.visualize_image(batch_file, batch_input, self.pipeline_res)
 
+    def stop(self):
+        """Signal to stop prediction and release resources safely"""
+        self.stop_requested = True
+        
+        # Wait for capture thread to finish reading before releasing capture
+        if self.capture_thread is not None and self.capture_thread.is_alive():
+            # Join with timeout to avoid hanging if thread is totally stuck
+            self.capture_thread.join(timeout=2)
+            self.capture_thread = None
+
+        if self.capture is not None:
+            # Releasing while another thread is calling capture.read() 
+            # triggers SIGABRT in FFmpeg/OpenCV (Assertion fctx->async_lock failed)
+            self.capture.release()
+            self.capture = None
+            
+        if self.pushstream is not None:
+            self.pushstream.release()
+            self.pushstream = None
+
     def capturevideo(self, capture, queue):
         frame_id = 0
-        while (1):
+        while not self.stop_requested:
             if queue.full():
                 time.sleep(0.1)
             else:
                 ret, frame = capture.read()
-                if not ret:
+                if not ret or self.stop_requested:
                     return
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 queue.put(frame_rgb)
 
     def predict_video(self, video_file, thread_idx=0):
+        # Reset stop_requested before starting
+        self.stop_requested = False
+        
         # mot
         # mot -> attr
         # mot -> pose -> action
-        capture = cv2.VideoCapture(video_file)
+        self.capture = cv2.VideoCapture(video_file)
+        capture = self.capture
 
         # Get Video info : resolution, fps, frame count
         width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -672,8 +700,9 @@ class PipePredictor(object):
             video_out_name = 'output' if self.file_name is None else self.file_name
             pushurl = os.path.join(self.pushurl, video_out_name)
             print("the result will push stream to url:{}".format(pushurl))
-            pushstream = PushStream(pushurl)
-            pushstream.initcmd(fps, width, height)
+            self.pushstream = PushStream(pushurl)
+            self.pushstream.initcmd(fps, width, height)
+            pushstream = self.pushstream
         elif self.cfg['visual'] and self.output_dir:
             video_out_name = 'output' if (
                 self.file_name is None or
@@ -735,14 +764,14 @@ class PipePredictor(object):
         retrograde_traj_len = 0
         framequeue = queue.Queue(10)
 
-        thread = threading.Thread(
+        self.capture_thread = threading.Thread(
             target=self.capturevideo, args=(capture, framequeue))
-        thread.start()
+        self.capture_thread.start()
         time.sleep(1)
 
         isRtsp = type(video_file) == str and "rtsp" in video_file
 
-        while (not framequeue.empty() or thread.is_alive()):
+        while (not framequeue.empty() or self.capture_thread.is_alive()) and not self.stop_requested:
             if frame_id % 10 == 0:
                 # print('Thread: {}; frame id: {}'.format(thread_idx, frame_id))
                 pass
@@ -1107,7 +1136,10 @@ class PipePredictor(object):
                     self.fight_tracker.update(video_action_res, im)
 
                 if len(self.pushurl) > 0:
-                    pushstream.pipe.stdin.write(im.tobytes())
+                    try:
+                        pushstream.pipe.stdin.write(im.tobytes())
+                    except Exception as e:
+                        print(f"Error pushing stream: {e}")
                 elif writer:
                     writer.write(im)
                     if self.file_name is None:  # use camera_id
@@ -1118,6 +1150,11 @@ class PipePredictor(object):
         if self.cfg['visual'] and len(self.pushurl) == 0 and writer:
             writer.release()
             print('save result to {}'.format(out_path))
+        
+        # Release capture
+        if self.capture is not None:
+            self.capture.release()
+            self.capture = None
 
     def visualize_video(self,
                         image_rgb,

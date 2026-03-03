@@ -13,8 +13,6 @@ class VideoFightTracker(FightTrackerInt):
     def update(self, result: dict, frame):
         """Update current detections"""
 
-        logger.debug(f"Result: {result}")
-
         if result and result["class"] == 1:
             self.scores.append(result["score"])
 
