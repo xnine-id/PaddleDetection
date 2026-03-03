@@ -781,9 +781,6 @@ class PipePredictor(object):
             except queue.Empty:
                 continue
 
-            if self.fight_tracker and hasattr(self.fight_tracker, 'heartbeat'):
-                self.fight_tracker.heartbeat()
-
             if frame_id > self.warmup_frame:
                 self.pipe_timer.total_time.start()
 
