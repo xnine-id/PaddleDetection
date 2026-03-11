@@ -11,7 +11,7 @@ class FightDetector:
         self.device = device
 
     def predict_livestream(
-        self, rtsp_url: str, pushurl: str, fight_tracker: FightTrackerInt
+        self, cam_name: str, rtsp_url: str, pushurl: str, fight_tracker: FightTrackerInt
     ):
         args = SimpleNamespace(
             # required
@@ -50,7 +50,7 @@ class FightDetector:
             args, cfg, is_video=True, multi_camera=True, fight_tracker=fight_tracker
         )
 
-        filename = rtsp_url.split("/")[-1]
+        filename = cam_name if cam_name else rtsp_url.split("/")[-1]
         predictor.set_file_name(filename)
         return predictor
 

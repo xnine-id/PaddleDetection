@@ -40,7 +40,7 @@ class CameraProcessor:
         pushurl = self.pd_config.get("pushurl_prefix", "")
 
         self.predictor = self.fight_detector.predict_livestream(
-            self.url, pushurl, self.fight_tracker
+            self.cam_name, self.url, pushurl, self.fight_tracker
         )
         self.predictor_thread: Optional[threading.Thread] = None
 
