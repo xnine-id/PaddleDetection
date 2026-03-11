@@ -1,5 +1,4 @@
 import logging
-import sys
 import cv2
 import uuid
 import time
