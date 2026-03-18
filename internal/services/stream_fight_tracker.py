@@ -7,8 +7,8 @@ import threading
 import os
 from datetime import datetime
 
-from internal.service.fight_tracker_int import FightTrackerInt
-from internal.service.mqtt_service import MQTTService
+from internal.services.fight_tracker_int import FightTrackerInt
+from internal.services.mqtt_service import MQTTService
 
 logger = logging.getLogger("FIGHT_TRACKER")
 
@@ -25,17 +25,18 @@ class StreamFightTracker(FightTrackerInt):
         self.cam_name = cam_name
         self.mqtt_service = mqtt_service
 
-        self.current_score: Optional[int] = None
         self.threshold = 5
+        self.last_update_time = time.time()
+
+        self.current_score: Optional[int] = None
         self.update_count = 0
         self.event_id: Optional[str] = None
-        self.last_update_time = time.time()
 
     def heartbeat(self):
         """Update last update time to indicate predictor is still alive"""
         self.last_update_time = time.time()
 
-    def update(self, result: dict, frame):
+    def update(self, result: dict, frame, frame_ids: list[int]):
         """Update current detections"""
         self.heartbeat()
 
@@ -46,14 +47,13 @@ class StreamFightTracker(FightTrackerInt):
             prev_score = self.current_score
             self.current_score = result["score"]
 
+            snapshot = None
             if prev_score == None or self.event_id == None:
                 self.event_id = str(uuid.uuid4())
-
-            if self.mqtt_service:
-                snapshot = None
                 if self.snapshot_enabled and frame is not None:
                     snapshot = self._save_snapshot(frame)
 
+            if self.mqtt_service and self.current_score != prev_score:
                 self.mqtt_service.publish_event(
                     event_id=self.event_id,
                     cam_name=self.cam_name,
@@ -75,6 +75,11 @@ class StreamFightTracker(FightTrackerInt):
                         confidence=result["score"] * 100,
                         event_type="no_fight",
                     )
+
+    def reset(self):
+        self.current_score = None
+        self.event_id = None
+        self.update_count = 0
 
     def _save_snapshot(self, frame):
         today = datetime.now().strftime("%Y-%m-%d")

@@ -7,7 +7,7 @@ import subprocess
 from fastapi import APIRouter, HTTPException, UploadFile, File, status
 from fastapi.responses import FileResponse, JSONResponse
 from internal.core.fight_detector import FightDetector
-from internal.service.video_fight_tracker import VideoFightTracker
+from internal.services.video_fight_tracker import VideoFightTracker
 
 logger = logging.getLogger("API_ROUTES")
 

@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from PaddleDetection.deploy.pipeline.cfg_utils import merge_cfg
 from PaddleDetection.deploy.pipeline.pipeline import PipePredictor
-from internal.service.fight_tracker_int import FightTrackerInt
+from internal.services.fight_tracker_int import FightTrackerInt
 
 
 class FightDetector:

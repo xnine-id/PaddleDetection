@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Optional
 import logging
 from internal.core.fight_detector import FightDetector
 from internal.core.camera_processor import CameraProcessor
-from internal.service.mqtt_service import MQTTService
+from internal.services.mqtt_service import MQTTService
 
 logger = logging.getLogger("CameraManager")
 

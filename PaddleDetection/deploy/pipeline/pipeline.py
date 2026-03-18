@@ -752,6 +752,7 @@ class PipePredictor(object):
         video_fps = fps
 
         video_action_imgs = []
+        video_action_img_frame_ids = []
 
         if self.with_video_action:
             short_size = self.cfg["VIDEO_ACTION"]["short_size"]
@@ -780,9 +781,6 @@ class PipePredictor(object):
                 frame_rgb = framequeue.get(timeout=1)
             except queue.Empty:
                 continue
-
-            if self.fight_tracker and hasattr(self.fight_tracker, 'heartbeat'):
-                self.fight_tracker.heartbeat()
 
             if frame_id > self.warmup_frame:
                 self.pipe_timer.total_time.start()
@@ -1034,6 +1032,7 @@ class PipePredictor(object):
                     # Scale image
                     scaled_img = scale(frame_rgb)
                     video_action_imgs.append(scaled_img)
+                    video_action_img_frame_ids.append(frame_id)
 
                 # the number of collected frames is enough to predict video action
                 if len(video_action_imgs) == frame_len:
@@ -1133,7 +1132,8 @@ class PipePredictor(object):
                 if(is_update_video_action and self.fight_tracker):
                     is_update_video_action = False
                     video_action_res = self.pipeline_res.get('video_action')
-                    self.fight_tracker.update(video_action_res, im)
+                    self.fight_tracker.update(video_action_res, im, video_action_img_frame_ids)
+                    video_action_img_frame_ids.clear()
 
                 if len(self.pushurl) > 0:
                     try:

@@ -5,8 +5,8 @@ from threading import Event
 from typing import Optional, Dict, Any
 
 from internal.core.fight_detector import FightDetector
-from internal.service.stream_fight_tracker import StreamFightTracker
-from internal.service.mqtt_service import MQTTService
+from internal.services.stream_fight_tracker import StreamFightTracker
+from internal.services.mqtt_service import MQTTService
 
 logger = logging.getLogger("CameraProcessor")
 
@@ -87,17 +87,21 @@ class CameraProcessor:
                 if not thread_is_alive or is_stuck:
                     if self.predictor_thread is not None:
                         reason = "died" if not thread_is_alive else "stuck"
-                        logger.warning(f"[{self.cam_name}] Predictor {reason}. Reconnecting...")
-                        
+                        logger.warning(
+                            f"[{self.cam_name}] Predictor {reason}. Reconnecting..."
+                        )
+
                         # Stop existing predictor and its capture before starting a new one
                         # This prevents thread and resource accumulation (memory leak)
-                        logger.info(f"[{self.cam_name}] Stopping existing predictor resources...")
+                        logger.info(
+                            f"[{self.cam_name}] Stopping existing predictor resources..."
+                        )
                         self.predictor.stop()
-                        
+
                         # Wait a bit for the thread to exit if it's not totally hung
                         if self.predictor_thread.is_alive():
                             self.predictor_thread.join(timeout=2)
-                    
+
                     logger.info(f"[{self.cam_name}] Connecting to camera: {self.url}")
                     # Reset heartbeat before starting
                     self.fight_tracker.heartbeat()
@@ -136,10 +140,13 @@ class CameraProcessor:
 
         logger.info(f"[{self.cam_name}] Disabling camera processor status...")
         self.is_running = False
-        
+
         # Stop predictor resources
         self.predictor.stop()
-        
+
+        # Reset fight tracker
+        self.fight_tracker.reset()
+
         # Note: predictor_thread will continue until its current run() call finishes.
         # This usually happens when the stream is closed or an error occurs.
         # We don't join here because it might block MQTT/API response if the stream is hanging.
