@@ -1,14 +1,16 @@
 import logging
 import cv2
 import uuid
-import time
-from typing import Optional, Dict, Any
+from typing import Optional, List
 import threading
 import os
 from datetime import datetime
+import numpy as np
 
-from internal.services.fight_tracker_int import FightTrackerInt
-from internal.services.mqtt_service import MQTTService
+from internal.constants.infer_name import VIDEO_ACTION
+from internal.services.trackers.base.fight_tracker_int import FightTrackerInt
+from internal.services.mqtt.base.mqtt_service_int import MQTTServiceInt
+from internal.utils.config_loader import SnapshotConfig
 
 logger = logging.getLogger("FIGHT_TRACKER")
 
@@ -16,32 +18,26 @@ logger = logging.getLogger("FIGHT_TRACKER")
 class StreamFightTracker(FightTrackerInt):
     def __init__(
         self,
-        snapshot_config: Dict[str, Any],
+        snapshot_config: SnapshotConfig,
         cam_name: str,
-        mqtt_service: Optional[MQTTService],
+        mqtt_service: Optional[MQTTServiceInt],
     ):
-        self.snapshot_enabled = snapshot_config["enabled"]
-        self.output_dir = snapshot_config["output_dir"]
+        self.snapshot_enabled = snapshot_config.enabled
+        self.output_dir = snapshot_config.output_dir
         self.cam_name = cam_name
         self.mqtt_service = mqtt_service
 
         self.threshold = 5
-        self.last_update_time = time.time()
 
         self.current_score: Optional[int] = None
         self.update_count = 0
         self.event_id: Optional[str] = None
 
-    def heartbeat(self):
-        """Update last update time to indicate predictor is still alive"""
-        self.last_update_time = time.time()
-
-    def update(self, result: dict, frame, frame_ids: list[int]):
-        """Update current detections"""
-        self.heartbeat()
-
-        logger.debug(f"[{self.cam_name}] Result: {result}")
-
+    def update(self, result: dict, frame: np.ndarray, frame_ids: Optional[List[int]] = None):
+        """
+        Update current detections and check for fight events.
+        Also updates the heartbeat timestamp to indicate the tracker is active.
+        """
         if result and result["class"] == 1:
             self.update_count = 0
             prev_score = self.current_score
@@ -77,15 +73,15 @@ class StreamFightTracker(FightTrackerInt):
                     )
 
     def reset(self):
+        """Reset internal state of the tracker"""
         self.current_score = None
         self.event_id = None
         self.update_count = 0
 
-    def _save_snapshot(self, frame):
+    def _save_snapshot(self, frame: np.ndarray):
+        """Save snapshot in a separate thread to avoid blocking"""
         today = datetime.now().strftime("%Y-%m-%d")
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-
-        """Save snapshot in a separate thread to avoid blocking"""
 
         def save_task():
             try:
@@ -98,10 +94,10 @@ class StreamFightTracker(FightTrackerInt):
                 )
                 cv2.imwrite(final_output, frame)
             except Exception as e:
-                logger.Info(f"[{self.cam_name}] Failed to save snapshot: {e}")
+                logger.exception(f"[{self.cam_name}] Failed to save snapshot: {e}")
 
         # Run in background
         threading.Thread(target=save_task, daemon=True).start()
 
         # Return path immediately (predicted path)
-        return f"/snapshots/{today}/{self.cam_name}_{timestamp}.jpg"
+        return f"/snapshots/{VIDEO_ACTION}/{today}/{self.cam_name}_{timestamp}.jpg"

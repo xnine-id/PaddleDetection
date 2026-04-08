@@ -16,7 +16,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from internal.api.routes import create_router
 from internal.core.camera_manager import CameraManager
-from internal.core.fight_detector import FightDetector
+from internal.core.predictor_wrapper import PredictorWrapper
 from internal.utils.config_loader import load_config
 from internal.utils.logging_utils import setup_logging
 
@@ -29,11 +29,11 @@ def create_app():
     # Load configuration
     config = load_config("configs/config.yml")
 
-    fight_detector = FightDetector(
-        cfg_path=config["paddle_detection"]["config_path"],
-        device=config["paddle_detection"]["device"],
+    predictor_wrapper = PredictorWrapper(
+        cfg_path=config.system.config_path,
+        device=config.system.device,
     )
-    manager = CameraManager(fight_detector, config)
+    manager = CameraManager(predictor_wrapper, config)
 
     # Lifespan handler
     @asynccontextmanager
@@ -45,7 +45,7 @@ def create_app():
 
             yield
         except Exception as e:
-            logger.error(f"Unknown error in lifespan: {e}")
+            logger.exception(f"Unknown error in lifespan: {e}")
         finally:
             # Shutdown
             logger.info("Stopping camera manager...")
@@ -64,7 +64,7 @@ def create_app():
         allow_headers=["*"],
     )
 
-    api_router = create_router(fight_detector, config)
+    api_router = create_router(predictor_wrapper, config)
     app.include_router(api_router, prefix="/api")
 
     @app.get("/health", tags=["System"])
@@ -87,5 +87,5 @@ if __name__ == "__main__":
             app, host=host, port=port, log_level=os.getenv("UVICORN_LOG_LEVEL", "info")
         )
     except Exception as e:
-        logger.error(f"Failed to start API: {e}")
+        logger.exception(f"Failed to start API: {e}")
         sys.exit(1)

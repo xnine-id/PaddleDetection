@@ -8,7 +8,7 @@ DET:
 
 MOT:
   model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/mot_ppyoloe_s_36e_ppvehicle.zip
-  tracker_config: deploy/pipeline/config/tracker_config.yml
+  tracker_config: PaddleDetection/deploy/pipeline/config/tracker_config.yml
   batch_size: 1
   skip_frame_num: 3 # preferably no more than 3
   enable: False
@@ -20,7 +20,7 @@ VEHICLE_PLATE:
   rec_model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/ch_PP-OCRv3_rec_infer.tar.gz
   rec_image_shape: [3, 48, 320]
   rec_batch_num: 6
-  word_dict_path: deploy/pipeline/ppvehicle/rec_word_dict.txt
+  word_dict_path: PaddleDetection/deploy/pipeline/ppvehicle/rec_word_dict.txt
   enable: True
 
 VEHICLE_ATTR:
@@ -31,7 +31,7 @@ VEHICLE_ATTR:
   enable: False
 
 LANE_SEG:
-  lane_seg_config: deploy/pipeline/config/lane_seg_config.yml
+  lane_seg_config: PaddleDetection/deploy/pipeline/config/lane_seg_config.yml
   model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/pp_lite_stdc2_bdd100k.zip
 
 VEHICLE_PRESSING:

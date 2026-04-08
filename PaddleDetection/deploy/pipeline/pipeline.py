@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+from typing import Any, Dict
 import yaml
 import glob
 import cv2
@@ -264,8 +265,10 @@ class PipePredictor(object):
             default as False
     """
 
-    def __init__(self, args, cfg, is_video=True, multi_camera=False, fight_tracker=None):
-        self.fight_tracker = fight_tracker
+    def __init__(self, args, cfg, is_video=True, multi_camera=False):
+        self.trackers: Dict[str, Any] = {}
+        self.last_update_time = time.time()
+        self.stop_requested = False
 
         # general module for pphuman and ppvehicle
         self.with_mot = cfg.get('MOT', False)['enable'] if cfg.get(
@@ -364,7 +367,7 @@ class PipePredictor(object):
         self.illegal_parking_time = args.illegal_parking_time
 
         self.warmup_frame = self.cfg['warmup_frame']
-        self.stop_requested = False
+
         self.capture = None
         self.capture_thread = None
         self.pushstream = None
@@ -523,6 +526,15 @@ class PipePredictor(object):
                 self.video_action_predictor = VideoActionRecognizer.init_with_cfg(
                     args, video_action_cfg)
 
+    def append_tracker(self, tracker_name: str, tracker: Dict[str, Any]):
+        self.trackers[tracker_name] = tracker
+
+    def remove_tracker(self, tracker_name: str):
+        self.trackers.pop(tracker_name, None)
+
+    def get_tracker(self, tracker_name: str):
+        return self.trackers.get(tracker_name, None)
+
     def set_file_name(self, path):
         if type(path) == int:
             self.file_name = path
@@ -645,6 +657,15 @@ class PipePredictor(object):
 
             if self.cfg['visual']:
                 self.visualize_image(batch_file, batch_input, self.pipeline_res)
+
+                vehicleplate_tracker = self.get_tracker('vehicleplate')
+                if (vehicleplate_tracker is not None):
+                    for i, im_file in enumerate(batch_file):
+                        vehicleplate_res = self.pipeline_res.get('vehicleplate')
+                        det_res = self.pipeline_res.get('det')
+                        img_name = os.path.split(im_file)[-1]
+
+                        vehicleplate_tracker.update({'vehicleplate': vehicleplate_res, 'det': det_res}, img_name)
 
     def stop(self):
         """Signal to stop prediction and release resources safely"""
@@ -775,6 +796,7 @@ class PipePredictor(object):
         while (not framequeue.empty() or self.capture_thread.is_alive()) and not self.stop_requested:
             if frame_id % 10 == 0:
                 # print('Thread: {}; frame id: {}'.format(thread_idx, frame_id))
+                self.last_update_time = time.time()
                 pass
 
             try:
@@ -1129,11 +1151,19 @@ class PipePredictor(object):
                                           illegal_parking_dict)  # visualize
 
                 # For snapshot
-                if(is_update_video_action and self.fight_tracker):
-                    is_update_video_action = False
-                    video_action_res = self.pipeline_res.get('video_action')
-                    self.fight_tracker.update(video_action_res, im, video_action_img_frame_ids)
-                    video_action_img_frame_ids.clear()
+                if(is_update_video_action):
+                    fight_tracker = self.get_tracker('video_action')
+                    if (fight_tracker is not None):
+                        is_update_video_action = False
+                        video_action_res = self.pipeline_res.get('video_action')
+                        fight_tracker.update(video_action_res, im, video_action_img_frame_ids)
+                        video_action_img_frame_ids.clear()
+
+                vehicleplate_tracker = self.get_tracker('vehicleplate')
+                if (vehicleplate_tracker is not None):
+                    vehicleplate_res = self.pipeline_res.get('vehicleplate')
+                    mot_res = self.pipeline_res.get('mot')
+                    vehicleplate_tracker.update({'vehicleplate': vehicleplate_res, 'mot': mot_res}, im)
 
                 if len(self.pushurl) > 0:
                     try:

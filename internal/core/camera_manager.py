@@ -1,41 +1,50 @@
 import threading
-from typing import Dict, Any, List, Optional
+from typing import Dict, List
 import logging
-from internal.core.fight_detector import FightDetector
+from internal.constants.infer_name import VEHICLE_PLATE, VIDEO_ACTION
+from internal.core.predictor_wrapper import PredictorWrapper
 from internal.core.camera_processor import CameraProcessor
-from internal.services.mqtt_service import MQTTService
+from internal.services.mqtt.base.mqtt_service_int import MQTTServiceInt
+from internal.services.mqtt.fight_mqtt_service import FightMQTTService
+from internal.services.mqtt.plate_mqtt_service import PlateMQTTService
+from internal.utils.config_loader import AppConfig
 
 logger = logging.getLogger("CameraManager")
 
 
 class CameraManager:
-    def __init__(self, fight_detector: FightDetector, config: Dict[str, Any]):
+    """
+    Manages multiple camera processors, initializes them based on the configuration,
+    and handles their threading lifecycle (start/stop).
+    """
+    def __init__(self, predictor_wrapper: PredictorWrapper, config: AppConfig):
         self.config = config
-        self.fight_detector = fight_detector
-        self.mqtt_service: Optional[MQTTService] = None
+        self.predictor_wrapper = predictor_wrapper
+        self.mqtt_services: Dict[str, MQTTServiceInt] = {}
 
-        if self.config.get("mqtt", {}).get("enabled", False):
-            self.mqtt_service = MQTTService(self.config)
+        # Initialize MQTT services for each detection module if enabled
+        if self.config.detection.fight.mqtt.enabled:
+            self.mqtt_services[VIDEO_ACTION] = FightMQTTService(self.config.detection.fight.mqtt)
+        
+        if self.config.detection.vehicle_plate.mqtt.enabled:
+            self.mqtt_services[VEHICLE_PLATE] = PlateMQTTService(self.config.detection.vehicle_plate.mqtt)
 
         self.threads: List[threading.Thread] = []
         self.camera_processors: Dict[str, CameraProcessor] = {}
         self.stop_event = threading.Event()
 
     def _create_camera_processors(self):
-        pd_config = self.config.get("paddle_detection", {})
-        snapshot_config = self.config.get("snapshot", {})
-
-        for idx, cam in enumerate(self.config.get("cameras", [])):
+        for idx, cam_config in enumerate(self.config.cameras):
             proc = CameraProcessor(
-                cam_config=cam,
-                snapshot_config=snapshot_config,
-                pd_config=pd_config,
-                fight_detector=self.fight_detector,
-                mqtt_service=self.mqtt_service,
+                cam_config=cam_config,
+                detection_config=self.config.detection,
+                system_config=self.config.system,
+                predictor_wrapper=self.predictor_wrapper,
+                mqtt_services=self.mqtt_services,
                 thread_idx=idx,
                 stop_event=self.stop_event,
             )
-            self.camera_processors[cam["name"]] = proc
+            self.camera_processors[cam_config.name] = proc
 
     def start(self):
         logger.info("Starting camera manager...")
@@ -55,7 +64,7 @@ class CameraManager:
             logger.info("Ctrl+C detected. Stopping...")
             self.stop()
         except Exception as e:
-            logger.error(f"Unexpected error: {e}")
+            logger.exception(f"Unexpected error: {e}")
             self.stop()
 
     def stop(self):
@@ -83,7 +92,7 @@ class CameraManager:
             self.threads.clear()
             self.camera_processors.clear()
 
-        if self.mqtt_service:
-            self.mqtt_service.disconnect()
+        for service in self.mqtt_services.values():
+            service.disconnect()
 
         logger.info("System stopped")

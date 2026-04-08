@@ -3,14 +3,14 @@ visual: True
 warmup_frame: 50
 
 DET:
-  model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/mot_ppyoloe_s_36e_ppvehicle.zip
+  model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/mot_ppyoloe_l_36e_ppvehicle.zip
   batch_size: 1
 
 MOT:
-  model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/mot_ppyoloe_s_36e_ppvehicle.zip
+  model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/mot_ppyoloe_l_36e_ppvehicle.zip
   tracker_config: deploy/pipeline/config/tracker_config.yml
   batch_size: 1
-  skip_frame_num: 3 # preferably no more than 3
+  skip_frame_num: -1 # preferably no more than 3
   enable: False
 
 VEHICLE_PLATE:
@@ -21,7 +21,7 @@ VEHICLE_PLATE:
   rec_image_shape: [3, 48, 320]
   rec_batch_num: 6
   word_dict_path: deploy/pipeline/ppvehicle/rec_word_dict.txt
-  enable: True
+  enable: False
 
 VEHICLE_ATTR:
   model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/vehicle_attribute_model.zip

@@ -1,21 +1,31 @@
 paddle_detection:
-  script_path: "/app/PaddleDetection/deploy/pipeline/pipeline.py"
-  config_path: "/app/configs/infer_cfg_pphuman.yml"
+  config_path: "/app/configs/infer_cfg_combine.yml"
   device: gpu
-  pushurl_prefix: rtsp://mediamtx:8554/fight
   output_dir: '/app/storage/private/output'
+  pushurl_prefix: rtsp://mediamtx:8554
+
+detection:
+  fight:
+    snapshot:
+      enabled: true
+      output_dir: '/app/storage/private/snapshots/fight'
+    mqtt:
+      enabled: true
+      event_topic_prefix: "fight_detection/events" # publish fight event
+      command_topic_prefix: "fight_detection/cmd" # enable/disable. ex: fight_detection/cmd/webcam1 {"run": true/false}
+      state_topic_prefix: "fight_detection/state" # camera state. ex: fight_detection/state/webcam1 true
+
+  vehicle_plate:
+    snapshot:
+      enabled: true
+      output_dir: '/app/storage/private/snapshots/vehicle_plate'
+    mqtt:
+      enabled: true
+      event_topic_prefix: "vehicle_plate_detection/events" # publish vehicle plate event
+      command_topic_prefix: "vehicle_plate_detection/cmd" # enable/disable. ex: vehicle_plate_detection/cmd/webcam1 {"run": true/false}
+      state_topic_prefix: "vehicle_plate_detection/state" # camera state. ex: vehicle_plate_detection/state/webcam1 true
 
 cameras:
   - name: "webcam1"
     url: "rtsp://mediamtx:8554/input/webcam1"
     enabled: true
-
-snapshot:
-  enabled: true
-  output_dir: '/app/storage/private/snapshots'
-
-mqtt:
-  enabled: true
-  event_topic_prefix: "fightdetection/events" # publish fight event
-  command_topic_prefix: "fightdetection/cmd" # enable/disable. ex: fightdetection/cmd/webcam1 {"run": true/false}
-  state_topic_prefix: "fightdetection/state" # camera state. ex: fightdetection/state/webcam1 true

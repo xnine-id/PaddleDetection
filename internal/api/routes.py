@@ -6,22 +6,29 @@ import uuid
 import subprocess
 from fastapi import APIRouter, HTTPException, UploadFile, File, status
 from fastapi.responses import FileResponse, JSONResponse
-from internal.core.fight_detector import FightDetector
-from internal.services.video_fight_tracker import VideoFightTracker
+from internal.constants.infer_name import VEHICLE_PLATE, VIDEO_ACTION
+from internal.core.predictor_wrapper import PredictorWrapper
+from internal.services.trackers.video.video_fight_tracker import VideoFightTracker
+
+from internal.utils.config_loader import AppConfig
 
 logger = logging.getLogger("API_ROUTES")
 
 
-def create_router(fight_detector: FightDetector, config: dict = None):
+def create_router(predictor_wrapper: PredictorWrapper, config: AppConfig):
     router = APIRouter()
 
-    snapshot_dir = config.get("snapshot", {}).get("output_dir") if config else None
-    output_dir = (
-        config.get("paddle_detection", {}).get("output_dir") if config else None
-    )
+    snapshot_dir = {
+        VIDEO_ACTION: config.detection.fight.snapshot.output_dir,
+        VEHICLE_PLATE: config.detection.vehicle_plate.snapshot.output_dir,
+    }
+    output_dir = config.system.output_dir
 
     @router.get("/videos/{filename}", summary="Get result video file", tags=["Video"])
     async def get_video(filename: str):
+        """
+        Serve a generated video file from the output directory.
+        """
         if not output_dir:
             raise HTTPException(
                 status_code=500, detail="Output directory not configured"
@@ -32,20 +39,20 @@ def create_router(fight_detector: FightDetector, config: dict = None):
         return FileResponse(file_path, media_type="video/mp4", filename=filename)
 
     @router.get(
-        "/snapshots/{date_str}/{filename}",
+        "/snapshots/{action}/{date_str}/{filename}",
         summary="Get snapshot image file",
         tags=["Snapshot"],
     )
-    async def get_snapshot(date_str: str, filename: str):
+    async def get_snapshot(action: str, date_str: str, filename: str):
         """
         Get snapshot image by date and filename.
         """
-        if not snapshot_dir:
+        if not snapshot_dir.get(action):
             raise HTTPException(
                 status_code=500, detail="Snapshot directory not configured"
             )
 
-        file_path = os.path.join(snapshot_dir, date_str, filename)
+        file_path = os.path.join(snapshot_dir.get(action, ''), date_str, filename)
 
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="Snapshot not found")
@@ -81,10 +88,10 @@ def create_router(fight_detector: FightDetector, config: dict = None):
                 os.makedirs(output_dir, exist_ok=True)
 
             # Run prediction
-            predictor = fight_detector.predict_video(
+            predictor = predictor_wrapper.predict_video(
                 video_file=input_path,
                 output_dir=output_dir,
-                fight_tracker=fight_tracker,
+                trackers={VIDEO_ACTION: fight_tracker},
             )
 
             # Important: set_file_name to avoid NoneType error in predictor.predict_video

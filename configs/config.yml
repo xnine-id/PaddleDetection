@@ -1,21 +1,31 @@
-paddle_detection:
-  script_path: "/home/jeremyjfn/app/fighting-detection/PaddleDetection/PaddleDetection/deploy/pipeline/pipeline.py"
-  config_path: "/home/jeremyjfn/app/fighting-detection/PaddleDetection/configs/infer_cfg_pphuman.yml"
+system:
+  config_path: "/home/jeremyjfn/app/skyure-df/PaddleDetection/configs/infer_cfg_combine.yml"
   device: gpu
-  pushurl_prefix: rtsp://localhost:8554/fight
-  output_dir: '/home/jeremyjfn/app/fighting-detection/PaddleDetection/storage/private/output'
+  output_dir: '/home/jeremyjfn/app/skyure-df/PaddleDetection/storage/private/output'
+  pushurl_prefix: rtsp://localhost:8554/paddle
+
+detection:
+  fight:
+    snapshot:
+      enabled: true
+      output_dir: '/home/jeremyjfn/app/skyure-df/PaddleDetection/storage/private/snapshots/fight'
+    mqtt:
+      enabled: true
+      event_topic_prefix: "fight_detection/events"
+      command_topic_prefix: "fight_detection/cmd"
+      state_topic_prefix: "fight_detection/state"
+
+  vehicle_plate:
+    snapshot:
+      enabled: true
+      output_dir: '/home/jeremyjfn/app/skyure-df/PaddleDetection/storage/private/snapshots/vehicle_plate'
+    mqtt:
+      enabled: true
+      event_topic_prefix: "vehicle_plate_detection/events"
+      command_topic_prefix: "vehicle_plate_detection/cmd"
+      state_topic_prefix: "vehicle_plate_detection/state"
 
 cameras:
   - name: "webcam1"
     url: "rtsp://localhost:8554/input/webcam1"
     enabled: true
-
-snapshot:
-  enabled: true
-  output_dir: '/home/jeremyjfn/app/fighting-detection/PaddleDetection/storage/private/snapshots'
-
-mqtt:
-  enabled: true
-  event_topic_prefix: "fightdetection/events" # publish fight event
-  command_topic_prefix: "fightdetection/cmd" # enable/disable. ex: fightdetection/cmd/webcam1 {"run": true/false}
-  state_topic_prefix: "fightdetection/state" # camera state. ex: fightdetection/state/webcam1 true

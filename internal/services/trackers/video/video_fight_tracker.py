@@ -1,8 +1,8 @@
 import json
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
-from internal.services.fight_tracker_int import FightTrackerInt
+from internal.services.trackers.base.fight_tracker_int import FightTrackerInt
 
 logger = logging.getLogger("API_FIGHT_TRACKER")
 
@@ -12,13 +12,14 @@ class VideoFightTracker(FightTrackerInt):
         self.scores: list[int] = []
         self.all_predictions: list[Dict[str, Any]] = []
 
-    def update(self, result: dict, frame, frame_ids: list[int]):
-        """Update current detections"""
+    def update(self, result: dict, frame, frame_ids: Optional[List[int]] = None):
+        """Update current detections and store the prediction results."""
+        ids_copy = frame_ids.copy() if frame_ids is not None else []
 
         self.all_predictions.append({
             "class": int(result["class"]),
             "score": float(result["score"]),
-            "frame_ids": frame_ids.copy(),
+            "frame_ids": ids_copy,
         })
 
         if result and result["class"] == 1:
@@ -36,6 +37,14 @@ class VideoFightTracker(FightTrackerInt):
     def get_lowest_score(self) -> float:
         return min(self.scores) if self.scores else 0
 
+    def reset(self):
+        """Reset the scores and predictions."""
+        self.scores = []
+        self.all_predictions = []
+
     def save_all_predictions(self, json_output_path: str):
+        """Save all predictions to a JSON file."""
+
+        logger.info(f"save all predictions ({len(self.all_predictions)}) to {json_output_path}")
         with open(json_output_path, "w") as f:
             json.dump(self.all_predictions, f, indent=2)    

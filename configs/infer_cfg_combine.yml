@@ -5,15 +5,15 @@ visual: True
 warmup_frame: 50
 
 DET:
-  model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/mot_ppyoloe_s_36e_pipeline.zip
+  model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/mot_ppyoloe_s_36e_ppvehicle.zip
   batch_size: 1
 
 MOT:
-  model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/mot_ppyoloe_s_36e_pipeline.zip
+  model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/mot_ppyoloe_s_36e_ppvehicle.zip
   tracker_config: PaddleDetection/deploy/pipeline/config/tracker_config.yml
   batch_size: 1
   skip_frame_num: 3 # preferably no more than 3
-  enable: False
+  enable: True
 
 KPT:
   model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/dark_hrnet_w32_256x192.zip
@@ -31,6 +31,16 @@ VIDEO_ACTION:
   sample_freq: 7
   short_size: 340
   target_size: 320
+  enable: True
+
+VEHICLE_PLATE:
+  det_model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/ch_PP-OCRv3_det_infer.tar.gz
+  det_limit_side_len: 736
+  det_limit_type: "min"
+  rec_model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/ch_PP-OCRv3_rec_infer.tar.gz
+  rec_image_shape: [3, 48, 320]
+  rec_batch_num: 6
+  word_dict_path: PaddleDetection/deploy/pipeline/ppvehicle/rec_word_dict.txt
   enable: True
 
 SKELETON_ACTION:
@@ -61,3 +71,13 @@ REID:
   model_dir:  https://bj.bcebos.com/v1/paddledet/models/pipeline/reid_model.zip
   batch_size: 16
   enable: False
+
+VEHICLE_PLATE:
+  det_model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/ch_PP-OCRv3_det_infer.tar.gz
+  det_limit_side_len: 736
+  det_limit_type: "min"
+  rec_model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/ch_PP-OCRv3_rec_infer.tar.gz
+  rec_image_shape: [3, 48, 320]
+  rec_batch_num: 6
+  word_dict_path: PaddleDetection/deploy/pipeline/ppvehicle/rec_word_dict.txt
+  enable: True

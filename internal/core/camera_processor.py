@@ -4,48 +4,69 @@ import time
 from threading import Event
 from typing import Optional, Dict, Any
 
-from internal.core.fight_detector import FightDetector
-from internal.services.stream_fight_tracker import StreamFightTracker
-from internal.services.mqtt_service import MQTTService
+from PaddleDetection.deploy.pipeline.pipeline import PipePredictor
+from internal.constants.infer_name import VEHICLE_PLATE, VIDEO_ACTION
+from internal.core.predictor_wrapper import PredictorWrapper
+from internal.services.mqtt.base.mqtt_service_int import MQTTServiceInt
+from internal.services.trackers.stream.stream_fight_tracker import StreamFightTracker
+from internal.services.trackers.stream.stream_vehicle_plate_tracker import StreamVehiclePlateTracker
+from internal.services.trackers.base.tracker_int import TrackerInt
+from internal.utils.config_loader import CameraConfig, DetectionConfig, SystemConfig
 
 logger = logging.getLogger("CameraProcessor")
 
 
 class CameraProcessor:
+    """
+    Manages the lifecycle of a camera stream, including initialization, 
+    running the predictor, handling disconnects, and auto-reconnecting.
+    """
     def __init__(
         self,
-        cam_config: Dict[str, Any],
-        snapshot_config: Dict[str, Any],
-        pd_config: Dict[str, Any],
-        fight_detector: FightDetector,
-        mqtt_service: Optional[MQTTService],
+        cam_config: CameraConfig,
+        detection_config: DetectionConfig,
+        system_config: SystemConfig,
+        predictor_wrapper: PredictorWrapper,
+        mqtt_services: Dict[str, MQTTServiceInt],
         thread_idx: int,
         stop_event: Event,
     ):
-        self.cam_name = cam_config["name"]
-        self.url = cam_config["url"]
-        self.is_running: bool = cam_config["enabled"]
-        self.pd_config = pd_config or {}
+        self.cam_name = cam_config.name
+        self.url = cam_config.url
+        self.is_running: bool = cam_config.enabled
+        self.system_config = system_config
         self.thread_idx = thread_idx
         self.stop_event = stop_event
 
-        self.mqtt_service = mqtt_service
-        self.fight_detector = fight_detector
-        self.fight_tracker = StreamFightTracker(
-            snapshot_config=snapshot_config,
+        self.mqtt_services = mqtt_services
+        self.predictor_wrapper = predictor_wrapper
+        self.detection_config = detection_config
+
+        # Initialize trackers with their respective MQTT services
+        self.trackers: Dict[str, TrackerInt] = {
+            VIDEO_ACTION: StreamFightTracker(
+                snapshot_config=detection_config.fight.snapshot,
+                cam_name=self.cam_name,
+                mqtt_service=self.mqtt_services.get(VIDEO_ACTION),
+            ),
+            VEHICLE_PLATE: StreamVehiclePlateTracker(
+                snapshot_config=detection_config.vehicle_plate.snapshot,
+                cam_name=self.cam_name,
+                mqtt_service=self.mqtt_services.get(VEHICLE_PLATE),
+            ),
+        }
+
+        self.predictor: PipePredictor = self.predictor_wrapper.predict_livestream(
             cam_name=self.cam_name,
-            mqtt_service=self.mqtt_service,
-        )
-
-        pushurl = self.pd_config.get("pushurl_prefix", "")
-
-        self.predictor = self.fight_detector.predict_livestream(
-            self.cam_name, self.url, pushurl, self.fight_tracker
+            rtsp_url=self.url,
+            pushurl_prefix=self.system_config.pushurl_prefix,
+            trackers=self.trackers,
         )
         self.predictor_thread: Optional[threading.Thread] = None
 
-        if self.mqtt_service:
-            self.mqtt_service.register_camera(
+        # Register camera with all MQTT services for command handling
+        for service in self.mqtt_services.values():
+            service.register_camera(
                 self.cam_name, self.is_running, self._on_mqtt_command
             )
 
@@ -60,7 +81,11 @@ class CameraProcessor:
                 self.stop()
 
     def run(self):
-        """Main loop for camera processor, handles auto-reconnect and stuck detection"""
+        """
+        Main loop for the camera processor.
+        Continuously checks the health of the predictor thread and the camera stream.
+        Handles auto-reconnect if the predictor thread dies or gets stuck (no heartbeat).
+        """
         logger.info(f"[{self.cam_name}] Starting main loop for camera processor...")
 
         while not self.stop_event.is_set():
@@ -75,7 +100,7 @@ class CameraProcessor:
                 is_stuck = False
                 if thread_is_alive:
                     time_since_last_update = (
-                        time.time() - self.fight_tracker.last_update_time
+                        time.time() - self.predictor.last_update_time
                     )
                     if time_since_last_update > 15:
                         logger.warning(
@@ -104,7 +129,7 @@ class CameraProcessor:
 
                     logger.info(f"[{self.cam_name}] Connecting to camera: {self.url}")
                     # Reset heartbeat before starting
-                    self.fight_tracker.heartbeat()
+                    self.predictor.last_update_time = time.time()
 
                     self.predictor_thread = threading.Thread(
                         target=self.predictor.run,
@@ -130,8 +155,8 @@ class CameraProcessor:
         logger.info(f"[{self.cam_name}] Enabling camera processor status...")
         self.is_running = True
 
-        if self.mqtt_service:
-            self.mqtt_service.publish_state(self.cam_name, self.is_running)
+        for service in self.mqtt_services.values():
+            service.publish_state(self.cam_name, self.is_running)
         logger.info(f"[{self.cam_name}] Status changed to ENABLED")
 
     def stop(self):
@@ -144,13 +169,13 @@ class CameraProcessor:
         # Stop predictor resources
         self.predictor.stop()
 
-        # Reset fight tracker
-        self.fight_tracker.reset()
+        for tracker in self.trackers.values():
+            tracker.reset()
 
         # Note: predictor_thread will continue until its current run() call finishes.
         # This usually happens when the stream is closed or an error occurs.
         # We don't join here because it might block MQTT/API response if the stream is hanging.
 
-        if self.mqtt_service:
-            self.mqtt_service.publish_state(self.cam_name, self.is_running)
+        for service in self.mqtt_services.values():
+            service.publish_state(self.cam_name, self.is_running)
         logger.info(f"[{self.cam_name}] Status changed to DISABLED")

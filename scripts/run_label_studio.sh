@@ -1,0 +1,1 @@
+LOCAL_FILES_SERVING_ENABLED=true LOCAL_FILES_DOCUMENT_ROOT=/home/jeremyjfn/app/skyure-df/PaddleDetection/storage/private/eval label-studio
