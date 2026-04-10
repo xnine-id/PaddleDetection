@@ -13,9 +13,7 @@ from internal.utils.config_loader import load_config
 from internal.core.predictor_wrapper import PredictorWrapper
 
 image_dir = "/home/jeremyjfn/app/skyure-df/PaddleDetection/storage/private/eval/frames/vehicle_plate/images"
-output_dir = (
-    "/home/jeremyjfn/app/skyure-df/PaddleDetection/storage/private/eval/results/vehicle_plate"
-)
+output_dir = "/home/jeremyjfn/app/skyure-df/PaddleDetection/storage/private/eval/results/vehicle_plate"
 
 # Load configuration
 config = load_config("configs/config.yml")

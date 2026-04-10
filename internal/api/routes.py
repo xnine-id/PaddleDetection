@@ -52,12 +52,17 @@ def create_router(predictor_wrapper: PredictorWrapper, config: AppConfig):
                 status_code=500, detail="Snapshot directory not configured"
             )
 
-        file_path = os.path.join(snapshot_dir.get(action, ''), date_str, filename)
+        # Security: Prevent directory traversal by ensuring the resolved path is within snapshot_dir
+        base_dir = os.path.abspath(snapshot_dir.get(action, ''))
+        requested_path = os.path.abspath(os.path.join(base_dir, date_str, filename))
 
-        if not os.path.exists(file_path):
+        if not requested_path.startswith(base_dir):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        if not os.path.exists(requested_path):
             raise HTTPException(status_code=404, detail="Snapshot not found")
 
-        return FileResponse(file_path)
+        return FileResponse(requested_path)
 
     @router.post(
         "/predict/video", summary="Predict from uploaded video", tags=["Predict"]
