@@ -1,13 +1,13 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from contextlib import asynccontextmanager
 import asyncio
 import logging
 import os
 import sys
 import uvicorn
-from dotenv import load_dotenv
-
-load_dotenv()
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -54,7 +54,7 @@ def create_app():
             if not start_task.done():
                 start_task.cancel()
 
-    app = FastAPI(title="Fighting Detection API", lifespan=lifespan)
+    app = FastAPI(title="Paddle Detection API", lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -64,12 +64,12 @@ def create_app():
         allow_headers=["*"],
     )
 
-    api_router = create_router(predictor_wrapper, config)
+    api_router = create_router(config)
     app.include_router(api_router, prefix="/api")
 
     @app.get("/health", tags=["System"])
     async def health_check():
-        return {"status": "ok", "message": "Fighting Detection API is running"}
+        return {"status": "ok", "message": "Paddle Detection API is running"}
 
     return app
 

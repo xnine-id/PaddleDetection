@@ -1,18 +1,19 @@
+import numpy as np
 import json
 import logging
 from typing import Dict, Any, List, Optional
 
-from internal.services.trackers.base.fight_tracker_int import FightTrackerInt
+from internal.services.trackers.base.tracker_int import TrackerInt
 
 logger = logging.getLogger("API_FIGHT_TRACKER")
 
 
-class VideoFightTracker(FightTrackerInt):
+class VideoFightTracker(TrackerInt):
     def __init__(self):
         self.scores: list[int] = []
         self.all_predictions: list[Dict[str, Any]] = []
 
-    def update(self, result: dict, frame, frame_ids: Optional[List[int]] = None):
+    def update(self, result: dict, frame: np.ndarray, frame_ids: Optional[List[int]] = None):
         """Update current detections and store the prediction results."""
         ids_copy = frame_ids.copy() if frame_ids is not None else []
 

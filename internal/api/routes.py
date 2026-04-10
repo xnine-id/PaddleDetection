@@ -1,3 +1,4 @@
+from internal.services.trackers.video.video_vehicle_plate_tracker import VideoVehiclePlateTracker
 import logging
 import os
 import tempfile
@@ -15,12 +16,16 @@ from internal.utils.config_loader import AppConfig
 logger = logging.getLogger("API_ROUTES")
 
 
-def create_router(predictor_wrapper: PredictorWrapper, config: AppConfig):
+def create_router(config: AppConfig):
     router = APIRouter()
 
     snapshot_dir = {
         VIDEO_ACTION: config.detection.fight.snapshot.output_dir,
         VEHICLE_PLATE: config.detection.vehicle_plate.snapshot.output_dir,
+    }
+    predictor_wrapper = {
+        VIDEO_ACTION: PredictorWrapper(config.detection.fight.config_path, device=config.system.device),
+        VEHICLE_PLATE: PredictorWrapper(config.detection.vehicle_plate.config_path, device=config.system.device),
     }
     output_dir = config.system.output_dir
 
@@ -47,13 +52,13 @@ def create_router(predictor_wrapper: PredictorWrapper, config: AppConfig):
         """
         Get snapshot image by date and filename.
         """
-        if not snapshot_dir.get(action):
+        if action not in snapshot_dir:
             raise HTTPException(
-                status_code=500, detail="Snapshot directory not configured"
+                status_code=400, detail="Action not found"
             )
 
         # Security: Prevent directory traversal by ensuring the resolved path is within snapshot_dir
-        base_dir = os.path.abspath(snapshot_dir.get(action, ''))
+        base_dir = os.path.abspath(snapshot_dir[action])
         requested_path = os.path.abspath(os.path.join(base_dir, date_str, filename))
 
         if not requested_path.startswith(base_dir):
@@ -64,19 +69,21 @@ def create_router(predictor_wrapper: PredictorWrapper, config: AppConfig):
 
         return FileResponse(requested_path)
 
-    @router.post(
-        "/predict/video", summary="Predict from uploaded video", tags=["Predict"]
-    )
-    async def predict_from_upload(file: UploadFile = File(...)):
+    async def _process_video_prediction(action: str, file: UploadFile, tracker):
         """
-        Upload a video file and run fight detection. Returns a JSON with URL and avg score.
+        Helper to handle common video upload, prediction run, and FFmpeg conversion.
         """
         if not output_dir:
             raise HTTPException(
                 status_code=500, detail="Output directory not configured"
             )
 
-        work_dir = tempfile.mkdtemp(prefix="fight_pred_")
+        if action not in predictor_wrapper:
+            raise HTTPException(
+                status_code=400, detail=f"Predictor for action '{action}' not found"
+            )
+
+        work_dir = tempfile.mkdtemp(prefix=f"{action}_pred_")
         try:
             # Save uploaded file to a temporary location
             ext = os.path.splitext(file.filename or "uploaded.mp4")[1] or ".mp4"
@@ -86,17 +93,15 @@ def create_router(predictor_wrapper: PredictorWrapper, config: AppConfig):
             with open(input_path, "wb") as f:
                 shutil.copyfileobj(file.file, f)
 
-            fight_tracker = VideoFightTracker()
-
             # Ensure output directory exists
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir, exist_ok=True)
 
             # Run prediction
-            predictor = predictor_wrapper.predict_video(
+            predictor = predictor_wrapper[action].predict_video(
                 video_file=input_path,
                 output_dir=output_dir,
-                trackers={VIDEO_ACTION: fight_tracker},
+                trackers={action: tracker},
             )
 
             # Important: set_file_name to avoid NoneType error in predictor.predict_video
@@ -113,7 +118,7 @@ def create_router(predictor_wrapper: PredictorWrapper, config: AppConfig):
                 logger.error(f"Prediction output file not found at {output_path}")
                 raise Exception("Prediction output file was not generated")
 
-            # 3.1 Convert to H.264 using FFmpeg (mp4v codec is not supported by browsers)
+            # Convert to H.264 using FFmpeg (mp4v codec is not supported by browsers)
             h264_filename = f"h264_{basename}.mp4"
             h264_path = os.path.join(output_dir, h264_filename)
 
@@ -141,18 +146,34 @@ def create_router(predictor_wrapper: PredictorWrapper, config: AppConfig):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )
-                # If conversion success, use the h264 file
                 output_filename = h264_filename
             except Exception as e:
                 logger.error(
                     f"FFmpeg conversion failed: {str(e)}. Using original file instead."
                 )
-                # If conversion fails, we'll try to proceed with the original file
 
-            # Compute avg score from fight tracker
-            avg_score = fight_tracker.get_avg_scores()
+            return output_filename
+        finally:
+            # Cleanup temp work dir
+            try:
+                shutil.rmtree(work_dir)
+            except Exception as e:
+                logger.warning(f"Failed to cleanup temp dir {work_dir}: {e}")
 
+    @router.post(
+        "/predict/video_action/video", summary="Predict fight from uploaded video", tags=["Predict"]
+    )
+    async def predict_fight_from_upload(file: UploadFile = File(...)):
+        """
+        Upload a video file and run fight detection. Returns a JSON with URL and avg score.
+        """
+        try:
+            tracker = VideoFightTracker()
+            output_filename = await _process_video_prediction(VIDEO_ACTION, file, tracker)
+
+            avg_score = tracker.get_avg_scores()
             url = f"/api/videos/{output_filename}"
+
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
                 content={"data": {"url": url, "score": avg_score}},
@@ -160,16 +181,38 @@ def create_router(predictor_wrapper: PredictorWrapper, config: AppConfig):
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Prediction failed error: {str(e)}")
+            logger.error(f"Fight prediction failed: {str(e)}")
             return JSONResponse(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 content={"detail": f"Prediction failed: {str(e)}"},
             )
-        finally:
-            # Cleanup temp work dir
-            try:
-                shutil.rmtree(work_dir)
-            except Exception as e:
-                logger.warning(f"Failed to cleanup temp dir {work_dir}: {e}")
+
+    @router.post(
+        "/predict/vehicleplate/video", summary="Predict vehicle plates from uploaded video", tags=["Predict"]
+    )
+    async def predict_vehicle_plate_from_upload(file: UploadFile = File(...)):
+        """
+        Upload a video file and run vehicle plate detection. Returns a JSON with URL and detections.
+        """
+        try:
+            tracker = VideoVehiclePlateTracker()
+            output_filename = await _process_video_prediction(VEHICLE_PLATE, file, tracker)
+
+            predictions = tracker.get_all_predictions()
+            url = f"/api/videos/{output_filename}"
+
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={"data": {"url": url, "detections": predictions}},
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Vehicle plate prediction failed: {str(e)}")
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"detail": f"Prediction failed: {str(e)}"},
+            )
+
 
     return router

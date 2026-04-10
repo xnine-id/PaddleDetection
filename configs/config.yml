@@ -6,6 +6,7 @@ system:
 
 detection:
   fight:
+    config_path: "/home/jeremyjfn/app/skyure-df/PaddleDetection/configs/infer_cfg_pphuman.yml"
     snapshot:
       enabled: true
       output_dir: '/home/jeremyjfn/app/skyure-df/PaddleDetection/storage/private/snapshots/fight'
@@ -16,6 +17,7 @@ detection:
       state_topic_prefix: "fight_detection/state"
 
   vehicle_plate:
+    config_path: "/home/jeremyjfn/app/skyure-df/PaddleDetection/configs/infer_cfg_ppvehicle.yml"
     snapshot:
       enabled: true
       output_dir: '/home/jeremyjfn/app/skyure-df/PaddleDetection/storage/private/snapshots/vehicle_plate'

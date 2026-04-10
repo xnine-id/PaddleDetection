@@ -20,6 +20,7 @@ class MQTTConfig:
 
 @dataclass
 class DetectionModuleConfig:
+    config_path: str
     snapshot: SnapshotConfig
     mqtt: MQTTConfig
 
@@ -79,6 +80,7 @@ REQUIRED_CONFIG = {
     },
     "detection": {
         "fight": {
+            "config_path": str,
             "snapshot": {"enabled": bool, "output_dir": str},
             "mqtt": {
                 "enabled": bool,
@@ -88,6 +90,7 @@ REQUIRED_CONFIG = {
             },
         },
         "vehicle_plate": {
+            "config_path": str,
             "snapshot": {"enabled": bool, "output_dir": str},
             "mqtt": {
                 "enabled": bool,
@@ -106,6 +109,7 @@ def _create_detection_module_config(
 ) -> DetectionModuleConfig:
     """Helper to create DetectionModuleConfig from dictionary"""
     return DetectionModuleConfig(
+        config_path=module_dict["config_path"],
         snapshot=SnapshotConfig(**module_dict["snapshot"]),
         mqtt=MQTTConfig(**module_dict["mqtt"]),
     )

@@ -8,7 +8,7 @@ from datetime import datetime
 import numpy as np
 
 from internal.constants.infer_name import VIDEO_ACTION
-from internal.services.trackers.base.fight_tracker_int import FightTrackerInt
+from internal.services.trackers.base.tracker_int import TrackerInt
 from internal.services.mqtt.base.mqtt_service_int import MQTTServiceInt
 from internal.utils.config_loader import SnapshotConfig
 
@@ -17,7 +17,7 @@ logger = logging.getLogger("FIGHT_TRACKER")
 FIGHT_TIME_THRESHOLD = 10  # seconds
 
 
-class StreamFightTracker(FightTrackerInt):
+class StreamFightTracker(TrackerInt):
     def __init__(
         self,
         snapshot_config: SnapshotConfig,
