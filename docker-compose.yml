@@ -17,6 +17,8 @@ services:
     volumes:
       - ./configs/docker_config.yml:/app/configs/config.yml:ro
       - ./configs/infer_cfg_pphuman.yml:/app/configs/infer_cfg_pphuman.yml:ro
+      - ./configs/infer_cfg_ppvehicle.yml:/app/configs/infer_cfg_ppvehicle.yml:ro
+      - ./configs/infer_cfg_combine.yml:/app/configs/infer_cfg_combine.yml:ro
       - ./storage:/app/storage:rw
       - ./storage/private/models:/root/.cache/paddle:rw
     deploy:

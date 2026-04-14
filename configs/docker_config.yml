@@ -1,4 +1,4 @@
-paddle_detection:
+system:
   config_path: "/app/configs/infer_cfg_combine.yml"
   device: gpu
   output_dir: '/app/storage/private/output'
@@ -6,6 +6,7 @@ paddle_detection:
 
 detection:
   fight:
+    config_path: "/app/configs/infer_cfg_pphuman.yml"
     snapshot:
       enabled: true
       output_dir: '/app/storage/private/snapshots/fight'
@@ -16,6 +17,7 @@ detection:
       state_topic_prefix: "fight_detection/state" # camera state. ex: fight_detection/state/webcam1 true
 
   vehicle_plate:
+    config_path: "/app/configs/infer_cfg_ppvehicle.yml"
     snapshot:
       enabled: true
       output_dir: '/app/storage/private/snapshots/vehicle_plate'
