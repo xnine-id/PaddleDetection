@@ -38,10 +38,16 @@ def create_router(config: AppConfig):
             raise HTTPException(
                 status_code=500, detail="Output directory not configured"
             )
-        file_path = os.path.join(output_dir, filename)
-        if not os.path.exists(file_path):
+        base_dir = os.path.abspath(output_dir)
+        requested_path = os.path.abspath(os.path.join(base_dir, filename))
+
+        if not requested_path.startswith(base_dir):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        if not os.path.exists(requested_path):
             raise HTTPException(status_code=404, detail="Video not found")
-        return FileResponse(file_path, media_type="video/mp4", filename=filename)
+
+        return FileResponse(requested_path, media_type="video/mp4", filename=filename)
 
     @router.get(
         "/snapshots/{action}/{date_str}/{filename}",
@@ -67,7 +73,7 @@ def create_router(config: AppConfig):
         if not os.path.exists(requested_path):
             raise HTTPException(status_code=404, detail="Snapshot not found")
 
-        return FileResponse(requested_path)
+        return FileResponse(requested_path, filename=filename)
 
     async def _process_video_prediction(action: str, file: UploadFile, tracker):
         """
@@ -176,7 +182,7 @@ def create_router(config: AppConfig):
 
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
-                content={"data": {"url": url, "score": avg_score}},
+                content={"data": {"filename": output_filename, "url": url, "score": avg_score}},
             )
         except HTTPException:
             raise
@@ -203,7 +209,7 @@ def create_router(config: AppConfig):
 
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
-                content={"data": {"url": url, "detections": predictions}},
+                content={"data": {"filename": output_filename, "url": url, "detections": predictions}},
             )
         except HTTPException:
             raise

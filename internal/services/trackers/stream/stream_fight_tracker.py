@@ -46,32 +46,35 @@ class StreamFightTracker(TrackerInt):
             or (now - self.last_fight_time).seconds > FIGHT_TIME_THRESHOLD
         )
 
-        if result and result["class"] == 1:
-            snapshot = None
-            self.last_fight_time = now
+        if result:
+            if result["class"] == 1:
+                snapshot = None
+                self.last_fight_time = now
 
-            if is_new_event:
-                self.event_id = str(uuid.uuid4())
-                if self.snapshot_enabled and frame is not None:
-                    snapshot = self._save_snapshot(frame)
+                if is_new_event:
+                    self.event_id = str(uuid.uuid4())
+                    if self.snapshot_enabled and frame is not None:
+                        snapshot = self._save_snapshot(frame)
 
-            if self.mqtt_service:
-                self.mqtt_service.publish_event(
-                    event_id=self.event_id,
-                    cam_name=self.cam_name,
-                    confidence=result["score"] * 100,
-                    snapshot=snapshot,
-                )
+                if self.mqtt_service:
+                    self.mqtt_service.publish_event(
+                        event_id=self.event_id,
+                        cam_name=self.cam_name,
+                        confidence=result["score"] * 100,
+                        snapshot=snapshot,
+                    )
 
-        else:
-            if is_new_event:
-                self.event_id = str(uuid.uuid4())
-                self.mqtt_service.publish_event(
-                    event_id=self.event_id,
-                    cam_name=self.cam_name,
-                    confidence=result["score"] * 100,
-                    event_type="no_fight",
-                )
+            else:
+                if is_new_event:
+                    self.event_id = str(uuid.uuid4())
+
+                    if self.mqtt_service:
+                        self.mqtt_service.publish_event(
+                            event_id=self.event_id,
+                            cam_name=self.cam_name,
+                            confidence=result["score"] * 100,
+                            event_type="no_fight",
+                        )
 
     def reset(self):
         """Reset internal state of the tracker"""
