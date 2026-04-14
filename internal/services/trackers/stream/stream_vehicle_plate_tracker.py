@@ -164,7 +164,7 @@ class StreamVehiclePlateTracker(TrackerInt):
     def _save_snapshot(self, frame: np.ndarray):
         """Save snapshot in a separate thread to avoid blocking"""
         today = datetime.now().strftime("%Y-%m-%d")
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:19] # include ms
         frame_copy = frame.copy()
 
         def save_task():
