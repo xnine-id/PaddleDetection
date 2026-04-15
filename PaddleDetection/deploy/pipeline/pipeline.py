@@ -793,7 +793,7 @@ class PipePredictor(object):
 
         isRtsp = type(video_file) == str and "rtsp" in video_file
 
-        while (not framequeue.empty() or self.capture_thread.is_alive()) and not self.stop_requested:
+        while (not framequeue.empty() or (self.capture_thread is not None and self.capture_thread.is_alive())) and not self.stop_requested:
             if frame_id % 10 == 0:
                 # print('Thread: {}; frame id: {}'.format(thread_idx, frame_id))
                 self.last_update_time = time.time()
