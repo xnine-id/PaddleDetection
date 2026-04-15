@@ -269,7 +269,7 @@ def create_router(config: AppConfig):
 
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
-            content={"message": "Job created", "job_id": job_id},
+            content={"message": "Job created", "data":{"job_id": job_id}},
         )
 
     @router.post(
@@ -290,7 +290,7 @@ def create_router(config: AppConfig):
 
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
-            content={"message": "Job created", "job_id": job_id},
+            content={"message": "Job created", "data":{"job_id": job_id}},
         )
 
     @router.post(
@@ -311,10 +311,10 @@ def create_router(config: AppConfig):
 
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
-            content={"message": "Job created", "job_id": job_id},
+            content={"message": "Job created", "data":{"job_id": job_id}},
         )
 
-    @router.get("/predict/status/{job_id}", summary="Get job status", tags=["Predict"])
+    @router.get("/jobs/{job_id}", summary="Get job status", tags=["Predict"])
     async def get_job_status(job_id: str):
         """
         Get the status of a background prediction job.
@@ -324,7 +324,7 @@ def create_router(config: AppConfig):
         
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={"job_id": job_id, **jobs[job_id]}
+            content={"data": {"job_id": job_id, **jobs[job_id]}}
         )
 
 
