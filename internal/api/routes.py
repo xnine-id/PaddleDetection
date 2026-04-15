@@ -6,8 +6,9 @@ import tempfile
 import shutil
 import uuid
 import subprocess
-from fastapi import APIRouter, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, HTTPException, UploadFile, File, status, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.concurrency import run_in_threadpool
 from internal.constants.infer_name import VEHICLE_PLATE, VIDEO_ACTION
 from internal.core.predictor_wrapper import PredictorWrapper
 from internal.services.trackers.video.video_fight_tracker import VideoFightTracker
@@ -29,6 +30,8 @@ def create_router(config: AppConfig):
         VEHICLE_PLATE: PredictorWrapper(config.detection.vehicle_plate.config_path, device=config.system.device),
     }
     output_dir = config.system.output_dir
+
+    jobs = {}
 
     @router.get(
         "/snapshots/{action}/{date_str}/{filename}",
@@ -72,13 +75,13 @@ def create_router(config: AppConfig):
             raise HTTPException(status_code=403, detail="Access denied")
 
         if not os.path.exists(requested_path):
-            raise HTTPException(status_code=404, detail="Video not found")
+            raise HTTPException(status_code=404, detail="File not found")
 
         import mimetypes
         mime_type, _ = mimetypes.guess_type(requested_path)
         return FileResponse(requested_path, media_type=mime_type or "application/octet-stream", filename=filename)
 
-    async def _process_video_prediction(action: str, file: UploadFile, tracker):
+    async def _process_video_prediction(action: str, temp_input: str, original_filename: str, tracker):
         """
         Helper to handle common video upload, prediction run, and FFmpeg conversion.
         """
@@ -92,23 +95,17 @@ def create_router(config: AppConfig):
                 status_code=400, detail=f"Predictor for action '{action}' not found"
             )
 
-        work_dir = tempfile.mkdtemp(prefix=f"{action}_pred_")
-        try:
-            # Save uploaded file to a temporary location
-            ext = os.path.splitext(file.filename or "uploaded.mp4")[1] or ".mp4"
-            basename = str(uuid.uuid4())
+        ext = os.path.splitext(original_filename or "uploaded.mp4")[1] or ".mp4"
+        basename = str(uuid.uuid4())
 
-            input_path = os.path.join(work_dir, f"{basename}{ext}")
-            with open(input_path, "wb") as f:
-                shutil.copyfileobj(file.file, f)
+        # Ensure output directory exists
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
 
-            # Ensure output directory exists
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir, exist_ok=True)
-
+        def _run_pred():
             # Run prediction
             predictor = predictor_wrapper[action].predict_video(
-                video_file=input_path,
+                video_file=temp_input,
                 output_dir=output_dir,
                 trackers={action: tracker},
             )
@@ -117,59 +114,56 @@ def create_router(config: AppConfig):
             predictor.set_file_name(basename)
 
             # Synchronous run; writes an MP4 into output_dir
-            predictor.run(input_path, thread_idx=0)
+            predictor.run(temp_input, thread_idx=0)
+        
+        await run_in_threadpool(_run_pred)
 
-            # Determine output file path (PaddleDetection saves it as {file_name}.mp4)
-            output_filename = f"{basename}.mp4"
-            output_path = os.path.join(output_dir, output_filename)
+        # Determine output file path (PaddleDetection saves it as {file_name}.mp4)
+        output_filename = f"{basename}.mp4"
+        output_path = os.path.join(output_dir, output_filename)
 
-            if not os.path.exists(output_path):
-                logger.error(f"Prediction output file not found at {output_path}")
-                raise Exception("Prediction output file was not generated")
+        if not os.path.exists(output_path):
+            logger.error(f"Prediction output file not found at {output_path}")
+            raise Exception("Prediction output file was not generated")
 
-            # Convert to H.264 using FFmpeg (mp4v codec is not supported by browsers)
-            h264_filename = f"h264_{basename}.mp4"
-            h264_path = os.path.join(output_dir, h264_filename)
+        # Convert to H.264 using FFmpeg (mp4v codec is not supported by browsers)
+        h264_filename = f"h264_{basename}.mp4"
+        h264_path = os.path.join(output_dir, h264_filename)
 
-            logger.debug(f"Converting video to H.264: {output_path} -> {h264_path}")
+        logger.debug(f"Converting video to H.264: {output_path} -> {h264_path}")
 
-            try:
-                ffmpeg_cmd = [
-                    "ffmpeg",
-                    "-y",
-                    "-i",
-                    output_path,
-                    "-vcodec",
-                    "libx264",
-                    "-acodec",
-                    "aac",
-                    "-pix_fmt",
-                    "yuv420p",
-                    "-movflags",
-                    "faststart",
-                    h264_path,
-                ]
-                subprocess.run(
-                    ffmpeg_cmd,
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
-                output_filename = h264_filename
-            except Exception as e:
-                logger.error(
-                    f"FFmpeg conversion failed: {str(e)}. Using original file instead."
-                )
+        try:
+            ffmpeg_cmd = [
+                "ffmpeg",
+                "-y",
+                "-i",
+                output_path,
+                "-vcodec",
+                "libx264",
+                "-acodec",
+                "aac",
+                "-pix_fmt",
+                "yuv420p",
+                "-movflags",
+                "faststart",
+                h264_path,
+            ]
+            await run_in_threadpool(
+                subprocess.run,
+                ffmpeg_cmd,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            output_filename = h264_filename
+        except Exception as e:
+            logger.error(
+                f"FFmpeg conversion failed: {str(e)}. Using original file instead."
+            )
 
-            return output_filename
-        finally:
-            # Cleanup temp work dir
-            try:
-                shutil.rmtree(work_dir)
-            except Exception as e:
-                logger.warning(f"Failed to cleanup temp dir {work_dir}: {e}")
+        return output_filename
 
-    async def _process_image_prediction(action: str, file: UploadFile, tracker):
+    async def _process_image_prediction(action: str, temp_input: str, original_filename: str, tracker):
         """
         Helper to handle common image upload, prediction run.
         """
@@ -182,130 +176,156 @@ def create_router(config: AppConfig):
             raise HTTPException(
                 status_code=400, detail=f"Predictor for action '{action}' not found"
             )
+        # Ensure output directory exists
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
 
-        work_dir = tempfile.mkdtemp(prefix=f"{action}_img_pred_")
-        try:
-            # Save uploaded file to a temporary location
-            ext = os.path.splitext(file.filename or "uploaded.jpg")[1] or ".jpg"
-            basename = str(uuid.uuid4())
-
-            input_path = os.path.join(work_dir, f"{basename}{ext}")
-            with open(input_path, "wb") as f:
-                shutil.copyfileobj(file.file, f)
-
-            # Ensure output directory exists
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir, exist_ok=True)
-
+        def _run_pred():
             # Run prediction
             predictor = predictor_wrapper[action].predict_image(
-                image_file=input_path,
+                image_file=temp_input,
                 output_dir=output_dir,
                 trackers={action: tracker},
             )
 
             # Important: set_file_name
-            predictor.set_file_name(input_path)
+            predictor.set_file_name(temp_input)
 
             # Synchronous run
-            predictor.run([input_path])
+            predictor.run([temp_input])
+            
+        await run_in_threadpool(_run_pred)
 
-            # Determine output file path (basename remains same, in output_dir)
-            output_filename = f"{basename}{ext}"
-            output_path = os.path.join(output_dir, output_filename)
+        # Determine output file path
+        output_filename = os.path.basename(temp_input)
+        output_path = os.path.join(output_dir, output_filename)
 
-            if not os.path.exists(output_path):
-                logger.error(f"Prediction output file not found at {output_path}")
-                raise Exception("Prediction output file was not generated")
+        if not os.path.exists(output_path):
+            logger.error(f"Prediction output file not found at {output_path}")
 
-            return output_filename
+        return output_filename
+
+    async def bg_predict_video_action(job_id: str, action: str, temp_input: str, original_filename: str):
+        jobs[job_id] = {"status": "processing"}
+        try:
+            tracker = VideoFightTracker() if action == VIDEO_ACTION else VideoVehiclePlateTracker()
+            output_filename = await _process_video_prediction(action, temp_input, original_filename, tracker)
+            
+            result_data = {"filename": output_filename, "url": f"/api/result/{output_filename}"}
+            if action == VIDEO_ACTION:
+                result_data["avg_score"] = tracker.get_avg_scores()
+            else:
+                result_data["detections"] = tracker.get_all_predictions()
+            
+            jobs[job_id]["status"] = "completed"
+            jobs[job_id]["result"] = result_data
+        except Exception as e:
+            logger.exception(f"Error processing video job {job_id}: {e}")
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = str(e)
         finally:
-            # Cleanup temp work dir
-            try:
-                shutil.rmtree(work_dir)
-            except Exception as e:
-                logger.warning(f"Failed to cleanup temp dir {work_dir}: {e}")
+            if os.path.exists(temp_input):
+                os.remove(temp_input)
+
+    async def bg_predict_image_action(job_id: str, action: str, temp_input: str, original_filename: str):
+        jobs[job_id] = {"status": "processing"}
+        try:
+            tracker = ImagesVehiclePlateTracker()
+            output_filename = await _process_image_prediction(action, temp_input, original_filename, tracker)
+            
+            predictions = tracker.get_all_predictions()
+            
+            result_data = {
+                "filename": output_filename, 
+                "url": f"/api/result/{output_filename}",
+                "detections": predictions[0] if len(predictions) >= 1 else None
+            }
+            
+            jobs[job_id]["status"] = "completed"
+            jobs[job_id]["result"] = result_data
+        except Exception as e:
+            logger.exception(f"Error processing image job {job_id}: {e}")
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = str(e)
+        finally:
+            if os.path.exists(temp_input):
+                os.remove(temp_input)
 
     @router.post(
         "/predict/video_action/video", summary="Predict fight from uploaded video", tags=["Predict"]
     )
-    async def predict_fight_from_upload(file: UploadFile = File(...)):
+    async def predict_fight_from_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
         """
-        Upload a video file and run fight detection. Returns a JSON with URL and avg score.
+        Upload a video file, start background job for fight detection, and return job id.
         """
-        try:
-            tracker = VideoFightTracker()
-            output_filename = await _process_video_prediction(VIDEO_ACTION, file, tracker)
+        temp_input = f"/tmp/{uuid.uuid4()}_{file.filename}"
+        with open(temp_input, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-            avg_score = tracker.get_avg_scores()
-            url = f"/api/result/{output_filename}"
+        job_id = str(uuid.uuid4())
+        jobs[job_id] = {"status": "pending"}
 
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={"data": {"filename": output_filename, "url": url, "avg_score": avg_score}},
-            )
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Fight prediction failed: {str(e)}")
-            return JSONResponse(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                content={"detail": f"Prediction failed: {str(e)}"},
-            )
+        background_tasks.add_task(bg_predict_video_action, job_id, VIDEO_ACTION, temp_input, file.filename)
+
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={"message": "Job created", "job_id": job_id},
+        )
 
     @router.post(
         "/predict/vehicleplate/video", summary="Predict vehicle plates from uploaded video", tags=["Predict"]
     )
-    async def predict_vehicle_plate_from_upload(file: UploadFile = File(...)):
+    async def predict_vehicle_plate_from_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
         """
-        Upload a video file and run vehicle plate detection. Returns a JSON with URL and detections.
+        Upload a video file, start background job for vehicle plate detection, and return job id.
         """
-        try:
-            tracker = VideoVehiclePlateTracker()
-            output_filename = await _process_video_prediction(VEHICLE_PLATE, file, tracker)
+        temp_input = f"/tmp/{uuid.uuid4()}_{file.filename}"
+        with open(temp_input, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-            predictions = tracker.get_all_predictions()
-            url = f"/api/result/{output_filename}"
+        job_id = str(uuid.uuid4())
+        jobs[job_id] = {"status": "pending"}
 
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={"data": {"filename": output_filename, "url": url, "detections": predictions}},
-            )
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Vehicle plate prediction failed: {str(e)}")
-            return JSONResponse(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                content={"detail": f"Prediction failed: {str(e)}"},
-            )
+        background_tasks.add_task(bg_predict_video_action, job_id, VEHICLE_PLATE, temp_input, file.filename)
+
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={"message": "Job created", "job_id": job_id},
+        )
 
     @router.post(
         "/predict/vehicleplate/image", summary="Predict vehicle plates from uploaded image", tags=["Predict"]
     )
-    async def predict_vehicle_plate_from_image(file: UploadFile = File(...)):
+    async def predict_vehicle_plate_from_image(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
         """
-        Upload a image file and run vehicle plate detection. Returns a JSON with URL and detections.
+        Upload an image file, start background job for vehicle plate detection, and return job id.
         """
-        try:
-            tracker = ImagesVehiclePlateTracker()
-            output_filename = await _process_image_prediction(VEHICLE_PLATE, file, tracker)
+        temp_input = f"/tmp/{uuid.uuid4()}_{file.filename}"
+        with open(temp_input, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-            predictions = tracker.get_all_predictions()
-            url = f"/api/result/{output_filename}"
+        job_id = str(uuid.uuid4())
+        jobs[job_id] = {"status": "pending"}
 
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={"data": {"filename": output_filename, "url": url, "detections": predictions[0] if len(predictions) >= 1 else None}},
-            )
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Vehicle plate prediction failed: {str(e)}")
-            return JSONResponse(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                content={"detail": f"Prediction failed: {str(e)}"},
-            )
+        background_tasks.add_task(bg_predict_image_action, job_id, VEHICLE_PLATE, temp_input, file.filename)
+
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={"message": "Job created", "job_id": job_id},
+        )
+
+    @router.get("/predict/status/{job_id}", summary="Get job status", tags=["Predict"])
+    async def get_job_status(job_id: str):
+        """
+        Get the status of a background prediction job.
+        """
+        if job_id not in jobs:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"job_id": job_id, **jobs[job_id]}
+        )
 
 
     return router
