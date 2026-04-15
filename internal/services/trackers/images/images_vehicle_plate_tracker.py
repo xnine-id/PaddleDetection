@@ -21,10 +21,13 @@ class ImagesVehiclePlateTracker:
         self.all_predictions.append(
             {
                 "image_name": image_name,
-                "vehicleplate": vehicleplate,
+                "vehicleplates": vehicleplate,
                 "scores": scores.tolist(),
             }
         )
+
+    def get_all_predictions(self):
+        return self.all_predictions
 
     def save_all_predictions(self, json_output_path: str):
         """Save all predictions to a JSON file."""
