@@ -56,10 +56,10 @@ def create_router(config: AppConfig):
 
         return FileResponse(requested_path, filename=filename)
 
-    @router.get("/videos/{filename}", summary="Get result video file", tags=["Video"])
-    async def get_video(filename: str):
+    @router.get("/result/{filename}", summary="Get result file", tags=["Predict"])
+    async def get_result(filename: str):
         """
-        Serve a generated video file from the output directory.
+        Serve a generated file from the output directory.
         """
         if not output_dir:
             raise HTTPException(
@@ -238,7 +238,7 @@ def create_router(config: AppConfig):
             output_filename = await _process_video_prediction(VIDEO_ACTION, file, tracker)
 
             avg_score = tracker.get_avg_scores()
-            url = f"/api/videos/{output_filename}"
+            url = f"/api/result/{output_filename}"
 
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
@@ -265,7 +265,7 @@ def create_router(config: AppConfig):
             output_filename = await _process_video_prediction(VEHICLE_PLATE, file, tracker)
 
             predictions = tracker.get_all_predictions()
-            url = f"/api/videos/{output_filename}"
+            url = f"/api/result/{output_filename}"
 
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
@@ -292,7 +292,7 @@ def create_router(config: AppConfig):
             output_filename = await _process_image_prediction(VEHICLE_PLATE, file, tracker)
 
             predictions = tracker.get_all_predictions()
-            url = f"/api/videos/{output_filename}"
+            url = f"/api/result/{output_filename}"
 
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
