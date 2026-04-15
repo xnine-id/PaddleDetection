@@ -7,13 +7,14 @@ import shutil
 import uuid
 import subprocess
 from fastapi import APIRouter, HTTPException, UploadFile, File, status, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 from internal.constants.infer_name import VEHICLE_PLATE, VIDEO_ACTION
 from internal.core.predictor_wrapper import PredictorWrapper
 from internal.services.trackers.video.video_fight_tracker import VideoFightTracker
 
 from internal.utils.config_loader import AppConfig
+from internal.api.schemas import JobCreateResponse, JobStatusResponse
 
 logger = logging.getLogger("API_ROUTES")
 
@@ -207,16 +208,23 @@ def create_router(config: AppConfig):
 
     async def bg_predict_video_action(job_id: str, action: str, temp_input: str, original_filename: str):
         jobs[job_id] = {"status": "processing"}
+
         try:
             tracker = VideoFightTracker() if action == VIDEO_ACTION else VideoVehiclePlateTracker()
             output_filename = await _process_video_prediction(action, temp_input, original_filename, tracker)
-            
+
             result_data = {"filename": output_filename, "url": f"/api/result/{output_filename}"}
             if action == VIDEO_ACTION:
-                result_data["avg_score"] = tracker.get_avg_scores()
+                result_data["detections"] = {
+                    'fight_detected': len(tracker.get_scores()) > 0,
+                    "max_score": tracker.get_highest_score(),
+                    "min_score": tracker.get_lowest_score(),
+                    "avg_score": tracker.get_avg_scores(),
+                    "fight_frequency": tracker.get_frequency(),
+                }
             else:
                 result_data["detections"] = tracker.get_all_predictions()
-            
+
             jobs[job_id]["status"] = "completed"
             jobs[job_id]["result"] = result_data
         except Exception as e:
@@ -232,13 +240,22 @@ def create_router(config: AppConfig):
         try:
             tracker = ImagesVehiclePlateTracker()
             output_filename = await _process_image_prediction(action, temp_input, original_filename, tracker)
-            
+
             predictions = tracker.get_all_predictions()
-            
+            result = []
+
+            if len(predictions) > 0:
+                for idx, plate in enumerate(predictions[0]['plates']):
+                    result.append({
+                        "vehicle_id": idx+1,
+                        "plates": [plate],
+                        "scores": [predictions[0]['scores'][idx] * 100]
+                    })
+
             result_data = {
                 "filename": output_filename, 
                 "url": f"/api/result/{output_filename}",
-                "detections": predictions[0] if len(predictions) >= 1 else None
+                "detections": result,
             }
             
             jobs[job_id]["status"] = "completed"
@@ -252,7 +269,11 @@ def create_router(config: AppConfig):
                 os.remove(temp_input)
 
     @router.post(
-        "/predict/video_action/video", summary="Predict fight from uploaded video", tags=["Predict"]
+        "/predict/video_action/video",
+        summary="Predict fight from uploaded video",
+        tags=["Predict"],
+        response_model=JobCreateResponse,
+        status_code=status.HTTP_202_ACCEPTED
     )
     async def predict_fight_from_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
         """
@@ -267,13 +288,14 @@ def create_router(config: AppConfig):
 
         background_tasks.add_task(bg_predict_video_action, job_id, VIDEO_ACTION, temp_input, file.filename)
 
-        return JSONResponse(
-            status_code=status.HTTP_202_ACCEPTED,
-            content={"message": "Job created", "data":{"job_id": job_id}},
-        )
+        return {"message": "Job created", "data": {"job_id": job_id}}
 
     @router.post(
-        "/predict/vehicleplate/video", summary="Predict vehicle plates from uploaded video", tags=["Predict"]
+        "/predict/vehicleplate/video",
+        summary="Predict vehicle plates from uploaded video",
+        tags=["Predict"],
+        response_model=JobCreateResponse,
+        status_code=status.HTTP_202_ACCEPTED
     )
     async def predict_vehicle_plate_from_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
         """
@@ -288,13 +310,14 @@ def create_router(config: AppConfig):
 
         background_tasks.add_task(bg_predict_video_action, job_id, VEHICLE_PLATE, temp_input, file.filename)
 
-        return JSONResponse(
-            status_code=status.HTTP_202_ACCEPTED,
-            content={"message": "Job created", "data":{"job_id": job_id}},
-        )
+        return {"message": "Job created", "data": {"job_id": job_id}}
 
     @router.post(
-        "/predict/vehicleplate/image", summary="Predict vehicle plates from uploaded image", tags=["Predict"]
+        "/predict/vehicleplate/image",
+        summary="Predict vehicle plates from uploaded image",
+        tags=["Predict"],
+        response_model=JobCreateResponse,
+        status_code=status.HTTP_202_ACCEPTED
     )
     async def predict_vehicle_plate_from_image(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
         """
@@ -309,12 +332,9 @@ def create_router(config: AppConfig):
 
         background_tasks.add_task(bg_predict_image_action, job_id, VEHICLE_PLATE, temp_input, file.filename)
 
-        return JSONResponse(
-            status_code=status.HTTP_202_ACCEPTED,
-            content={"message": "Job created", "data":{"job_id": job_id}},
-        )
+        return {"message": "Job created", "data": {"job_id": job_id}}
 
-    @router.get("/jobs/{job_id}", summary="Get job status", tags=["Predict"])
+    @router.get("/jobs/{job_id}", summary="Get job status", tags=["Predict"], response_model=JobStatusResponse)
     async def get_job_status(job_id: str):
         """
         Get the status of a background prediction job.
@@ -322,10 +342,7 @@ def create_router(config: AppConfig):
         if job_id not in jobs:
             raise HTTPException(status_code=404, detail="Job not found")
         
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={"data": {"job_id": job_id, **jobs[job_id]}}
-        )
+        return {"data": {"job_id": job_id, **jobs[job_id]}}
 
 
     return router

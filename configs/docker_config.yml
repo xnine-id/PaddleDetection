@@ -2,7 +2,7 @@ system:
   config_path: "/app/configs/infer_cfg_combine.yml"
   device: gpu
   output_dir: '/app/storage/private/output'
-  pushurl_prefix: rtsp://mediamtx:8554
+  pushurl_prefix: rtsp://mediamtx:8554/paddle
 
 detection:
   fight:

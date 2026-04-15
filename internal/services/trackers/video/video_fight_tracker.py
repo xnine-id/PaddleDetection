@@ -38,6 +38,11 @@ class VideoFightTracker(TrackerInt):
     def get_lowest_score(self) -> float:
         return min(self.scores) if self.scores else 0
 
+    def get_frequency(self):
+        total_frames = len(self.all_predictions)
+        fight_frames = len(self.scores)
+        return fight_frames / total_frames
+
     def reset(self):
         """Reset the scores and predictions."""
         self.scores = []

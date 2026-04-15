@@ -56,7 +56,7 @@ def evaluate_predictions(ground_truth_file, predictions_file, score_threshold=0.
         
         # Get predictions above threshold that have valid text length
         pred_texts = []
-        plates = pred.get('vehicleplate', [])
+        plates = pred.get('plates', [])
         scores = pred.get('scores', [])
         
         for i, p in enumerate(plates):

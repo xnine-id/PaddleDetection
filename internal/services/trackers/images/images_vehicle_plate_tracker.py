@@ -17,11 +17,10 @@ class ImagesVehiclePlateTracker:
         det_res = result.get("det", {})
         scores: np.ndarray = det_res["boxes"][:, 1]
         vehicleplate = result.get("vehicleplate", {}).get("vehicleplate", [])
-
         self.all_predictions.append(
             {
                 "image_name": image_name,
-                "vehicleplates": vehicleplate,
+                "plates": vehicleplate,
                 "scores": scores.tolist(),
             }
         )
