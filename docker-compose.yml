@@ -13,8 +13,7 @@ services:
     ports:
       - "${PORT}:${PORT}"
     networks:
-      - default
-      - deepface-engine_default
+      - skyure-network
     volumes:
       - ./configs/docker_config.yml:/app/configs/config.yml:ro
       - ./configs/infer_cfg_pphuman.yml:/app/configs/infer_cfg_pphuman.yml:ro
@@ -31,5 +30,5 @@ services:
               capabilities: [ gpu, compute, utility, video, graphics, display ]
 
 networks:
-  deepface-engine_default:
+  skyure-network:
     external: true
