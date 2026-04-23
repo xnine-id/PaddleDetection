@@ -5,3 +5,4 @@
 /venv-label/
 storage/
 __pycache__/
+*.db

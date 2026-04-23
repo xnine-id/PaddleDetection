@@ -1,15 +1,15 @@
 system:
-  config_path: "/home/jeremyjfn/app/skyure-df/PaddleDetection/configs/infer_cfg_combine.yml"
+  config_path: "/home/ams/app/skyure/PaddleDetection/configs/infer_cfg_combine.yml"
   device: gpu
-  output_dir: '/home/jeremyjfn/app/skyure-df/PaddleDetection/storage/private/output'
+  output_dir: '/home/ams/app/skyure/PaddleDetection/storage/private/output'
   pushurl_prefix: rtsp://localhost:8554/paddle
 
 detection:
   fight:
-    config_path: "/home/jeremyjfn/app/skyure-df/PaddleDetection/configs/infer_cfg_pphuman.yml"
+    config_path: "/home/ams/app/skyure/PaddleDetection/configs/infer_cfg_pphuman.yml"
     snapshot:
       enabled: true
-      output_dir: '/home/jeremyjfn/app/skyure-df/PaddleDetection/storage/private/snapshots/fight'
+      output_dir: '/home/ams/app/skyure/PaddleDetection/storage/private/snapshots/fight'
     mqtt:
       enabled: true
       event_topic_prefix: "fight_detection/events"
@@ -17,10 +17,10 @@ detection:
       state_topic_prefix: "fight_detection/state"
 
   vehicle_plate:
-    config_path: "/home/jeremyjfn/app/skyure-df/PaddleDetection/configs/infer_cfg_ppvehicle.yml"
+    config_path: "/home/ams/app/skyure/PaddleDetection/configs/infer_cfg_ppvehicle.yml"
     snapshot:
       enabled: true
-      output_dir: '/home/jeremyjfn/app/skyure-df/PaddleDetection/storage/private/snapshots/vehicle_plate'
+      output_dir: '/home/ams/app/skyure/PaddleDetection/storage/private/snapshots/vehicle_plate'
     mqtt:
       enabled: true
       event_topic_prefix: "vehicle_plate_detection/events"

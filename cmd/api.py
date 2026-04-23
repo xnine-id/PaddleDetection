@@ -19,6 +19,7 @@ from internal.core.camera_manager import CameraManager
 from internal.core.predictor_wrapper import PredictorWrapper
 from internal.utils.config_loader import load_config
 from internal.utils.logging_utils import setup_logging
+from internal.database.session import init_db
 
 logger = logging.getLogger("API")
 
@@ -42,6 +43,8 @@ def create_app():
             # Create a task for manager.start to avoid blocking startup
             # if it takes too long to initialize cameras or models
             start_task = asyncio.create_task(asyncio.to_thread(manager.start))
+            # Startup
+            await init_db()
 
             yield
         except Exception as e:
@@ -64,12 +67,8 @@ def create_app():
         allow_headers=["*"],
     )
 
-    api_router = create_router(config)
+    api_router = create_router(config, manager)
     app.include_router(api_router, prefix="/api")
-
-    @app.get("/health", tags=["System"])
-    async def health_check():
-        return {"status": "ok", "message": "Paddle Detection API is running"}
 
     return app
 

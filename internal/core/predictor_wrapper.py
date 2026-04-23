@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 from typing import Dict, Any
+import paddle
 
 from PaddleDetection.deploy.pipeline.cfg_utils import merge_cfg
 from PaddleDetection.deploy.pipeline.pipeline import PipePredictor
@@ -14,6 +15,9 @@ class PredictorWrapper:
     def __init__(self, cfg_path: str, device: str):
         self.cfg_path = cfg_path
         self.device = device
+        print("================== paddle run check ========================")
+        paddle.utils.run_check()
+        print("================== paddle run check ========================")
 
     def predict_livestream(
         self, cam_name: str, rtsp_url: str, pushurl_prefix: str, trackers: Dict[str, Any]

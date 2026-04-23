@@ -1,5 +1,6 @@
+from datetime import datetime
 from pydantic import BaseModel, Field
-from typing import List, Optional, Union, Any
+from typing import List, Optional, Union
 
 
 class JobData(BaseModel):
@@ -40,3 +41,50 @@ class JobStatusData(BaseModel):
 
 class JobStatusResponse(BaseModel):
     data: JobStatusData
+
+class AddCameraRequest(BaseModel):
+    name: str = Field(description="Name of the camera")
+    url: str = Field(description="URL of the camera stream")
+    detect_fps: int = Field(description="Frames per second for face detection")
+    is_enabled: bool = Field(description="Enable camera")
+    snapshot_enabled: bool = Field(description="Enable snapshot")
+    mqtt_enabled: bool = Field(description="Enable MQTT")
+
+class UpdateCameraRequest(BaseModel):
+    name: Optional[str] = Field(None, description="Name of the camera")
+    url: Optional[str] = Field(None, description="URL of the camera stream")
+    detect_fps: Optional[int] = Field(None, description="Frames per second for face detection")
+    is_enabled: Optional[bool] = Field(None, description="Enable camera")
+    snapshot_enabled: Optional[bool] = Field(None, description="Enable snapshot")
+    mqtt_enabled: Optional[bool] = Field(None, description="Enable MQTT")
+
+class CameraResponse(BaseModel):
+    id: int
+    name: str
+    url: str
+    detect_fps: int
+    is_enabled: bool
+    snapshot_enabled: bool
+    mqtt_enabled: bool
+
+    class Config:
+        from_attributes = True
+
+class GenerateApiKeyRequest(BaseModel):
+    name: str = Field(description="Name of the API key")
+    expires_at: Optional[datetime] = Field(None, description="Expiration date of the API key")
+
+class TokenResponse(BaseModel):
+    id: int
+    name: str
+    token: str
+    expires_at: Optional[datetime] = None
+    is_active: bool
+    is_admin: bool
+
+    class Config:
+        from_attributes = True
+
+class GenericResponse(BaseModel):
+    status: str = Field(example="success")
+    message: str = Field(example="Face registered successfully")
