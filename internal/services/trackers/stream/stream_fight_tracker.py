@@ -47,34 +47,39 @@ class StreamFightTracker(TrackerInt):
         )
 
         if result:
-            if result["class"] == 1:
-                snapshot = None
-                self.last_fight_time = now
+            is_fight = result["class"] == 1
+            confidence = result["score"] * 100
+            event_type = None
+            should_save_snapshot = False
 
+            if is_fight:
+                self.last_fight_time = now
                 if is_new_event:
                     self.event_id = str(uuid.uuid4())
-                    if self.snapshot_enabled and frame is not None:
-                        snapshot = self._save_snapshot(frame)
-
-                if self.mqtt_service:
-                    self.mqtt_service.publish_event(
-                        event_id=self.event_id,
-                        cam_name=self.cam_name,
-                        confidence=result["score"] * 100,
-                        snapshot=snapshot,
-                    )
-
+                    should_save_snapshot = True
+                    event_type = "fight"
             else:
                 if is_new_event:
                     self.event_id = str(uuid.uuid4())
+                    event_type = "no_fight"
 
-                    if self.mqtt_service:
-                        self.mqtt_service.publish_event(
-                            event_id=self.event_id,
-                            cam_name=self.cam_name,
-                            confidence=result["score"] * 100,
-                            event_type="no_fight",
-                        )
+            event_id = self.event_id
+
+            def mqtt_task(frame: np.ndarray):
+                snapshot = None
+                if should_save_snapshot and self.snapshot_enabled and frame is not None:
+                    snapshot = self._save_snapshot(frame)
+
+                if self.mqtt_service:
+                    self.mqtt_service.publish_event(
+                        event_id=event_id,
+                        cam_name=self.cam_name,
+                        confidence=confidence,
+                        snapshot=snapshot,
+                        event_type=event_type,
+                    )
+
+            threading.Thread(target=mqtt_task, args=(frame.copy(),), daemon=True).start()
 
     def reset(self):
         """Reset internal state of the tracker"""
@@ -85,23 +90,19 @@ class StreamFightTracker(TrackerInt):
         """Save snapshot in a separate thread to avoid blocking"""
         today = datetime.now().strftime("%Y-%m-%d")
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:19] # include ms
-        frame_copy = frame.copy()
 
-        def save_task():
-            try:
-                final_output_dir = os.path.join(self.output_dir, today)
+        try:
+            final_output_dir = os.path.join(self.output_dir, today)
 
-                os.makedirs(final_output_dir, exist_ok=True)
+            os.makedirs(final_output_dir, exist_ok=True)
 
-                final_output = os.path.join(
-                    final_output_dir, f"{self.cam_name}_{timestamp}.jpg"
-                )
-                cv2.imwrite(final_output, frame_copy)
-            except Exception as e:
-                logger.exception(f"[{self.cam_name}] Failed to save snapshot: {e}")
-
-        # Run in background
-        threading.Thread(target=save_task, daemon=True).start()
+            final_output = os.path.join(
+                final_output_dir, f"{self.cam_name}_{timestamp}.jpg"
+            )
+            cv2.imwrite(final_output, frame)
+        except Exception as e:
+            logger.exception(f"[{self.cam_name}] Failed to save snapshot: {e}")
+            return None
 
         # Return path immediately (predicted path)
         return f"/snapshots/{VIDEO_ACTION}/{today}/{self.cam_name}_{timestamp}.jpg"

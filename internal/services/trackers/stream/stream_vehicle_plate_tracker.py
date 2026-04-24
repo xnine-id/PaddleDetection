@@ -59,7 +59,6 @@ class StreamVehiclePlateTracker(TrackerInt):
         plates_list: List[str] = (result.get("vehicleplate", {}) or {}).get("plate", [])
 
         should_save_snapshot = False
-        snapshot = None
         mqtt_events_to_send = []
 
         for idx, box in enumerate(boxes):
@@ -129,20 +128,24 @@ class StreamVehiclePlateTracker(TrackerInt):
                         "score": current_best_score
                     })
 
-        if should_save_snapshot and self.snapshot_enabled:
-            snapshot = self._save_snapshot(frame)
+        def mqtt_task(frame: np.ndarray):
+            snapshot = None
+            if should_save_snapshot and self.snapshot_enabled:
+                snapshot = self._save_snapshot(frame)
 
-        if self.mqtt_service:
-            for event in mqtt_events_to_send:
-                event_id = str(uuid.uuid4())
-                self.mqtt_service.publish_event(
-                    event_id=event_id,
-                    cam_name=self.cam_name,
-                    confidence=event["score"],
-                    snapshot=snapshot,
-                    event_type=event["event_type"],
-                    metadata={"plate": event["plate"], "vehicle_id": event["vehicle_id"]},
-                )
+            if self.mqtt_service:
+                for event in mqtt_events_to_send:
+                    event_id = str(uuid.uuid4())
+                    self.mqtt_service.publish_event(
+                        event_id=event_id,
+                        cam_name=self.cam_name,
+                        confidence=event["score"],
+                        snapshot=snapshot,
+                        event_type=event["event_type"],
+                        metadata={"plate": event["plate"], "vehicle_id": event["vehicle_id"]},
+                    )
+
+        threading.Thread(target=mqtt_task, args=(frame.copy(),), daemon=True).start()
 
 
     def reset(self):
@@ -165,23 +168,19 @@ class StreamVehiclePlateTracker(TrackerInt):
         """Save snapshot in a separate thread to avoid blocking"""
         today = datetime.now().strftime("%Y-%m-%d")
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:19] # include ms
-        frame_copy = frame.copy()
 
-        def save_task():
-            try:
-                final_output_dir = os.path.join(self.output_dir, today)
+        try:
+            final_output_dir = os.path.join(self.output_dir, today)
 
-                os.makedirs(final_output_dir, exist_ok=True)
+            os.makedirs(final_output_dir, exist_ok=True)
 
-                final_output = os.path.join(
-                    final_output_dir, f"{self.cam_name}_{timestamp}.jpg"
-                )
-                cv2.imwrite(final_output, frame_copy)
-            except Exception as e:
-                logger.exception(f"[{self.cam_name}] Failed to save snapshot: {e}")
-
-        # Run in background
-        threading.Thread(target=save_task, daemon=True).start()
+            final_output = os.path.join(
+                final_output_dir, f"{self.cam_name}_{timestamp}.jpg"
+            )
+            cv2.imwrite(final_output, frame)
+        except Exception as e:
+            logger.exception(f"[{self.cam_name}] Failed to save snapshot: {e}")
+            return None
 
         # Return path immediately (predicted path)
         return f"/snapshots/{VEHICLE_PLATE}/{today}/{self.cam_name}_{timestamp}.jpg"
