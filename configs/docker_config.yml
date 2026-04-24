@@ -26,8 +26,3 @@ detection:
       event_topic_prefix: "vehicle_plate_detection/events" # publish vehicle plate event
       command_topic_prefix: "vehicle_plate_detection/cmd" # enable/disable. ex: vehicle_plate_detection/cmd/webcam1 {"run": true/false}
       state_topic_prefix: "vehicle_plate_detection/state" # camera state. ex: vehicle_plate_detection/state/webcam1 true
-
-cameras:
-  - name: "webcam1"
-    url: "rtsp://mediamtx:8554/input/webcam1"
-    enabled: true

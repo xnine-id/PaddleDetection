@@ -63,7 +63,7 @@ class MQTTServiceInt(ABC):
             if topic.startswith(self.cmd_prefix):
                 cam_name = topic.replace(f"{self.cmd_prefix}/", "")
                 if cam_name in self.command_callbacks:
-                    self.command_callbacks[cam_name](payload)
+                    self.command_callbacks[cam_name](topic, payload)
         except Exception as e:
             logger.error(f"[{self.service_name}] Error handling message on {msg.topic}: {e}")
 

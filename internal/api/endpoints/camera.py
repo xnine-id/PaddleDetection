@@ -8,11 +8,11 @@ from internal.api.schemas import AddCameraRequest, UpdateCameraRequest, CameraRe
 from typing import List
 
 
-async def get_camera_service(db: AsyncSession = Depends(get_db)):
-    return CameraService(db)
-
 def get_camera_router(camera_manager: CameraManager):
     router = APIRouter(prefix="/cameras", tags=["Camera"], dependencies=[Depends(verify_token)])
+
+    async def get_camera_service(db: AsyncSession = Depends(get_db)):
+        return CameraService(db, camera_manager)
 
     @router.get("", response_model=List[CameraResponse])
     async def list_cameras(service: CameraService = Depends(get_camera_service)):
@@ -28,7 +28,6 @@ def get_camera_router(camera_manager: CameraManager):
     @router.post("", response_model=CameraResponse)
     async def add_camera(request: AddCameraRequest, service: CameraService = Depends(get_camera_service)):
         camera = await service.create_camera(request)
-        # camera_manager.restart()
         return camera
 
     @router.put("/{camera_id}", response_model=CameraResponse)

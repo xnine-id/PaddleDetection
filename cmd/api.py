@@ -30,32 +30,24 @@ def create_app():
     # Load configuration
     config = load_config("configs/config.yml")
 
-    predictor_wrapper = PredictorWrapper(
-        cfg_path=config.system.config_path,
-        device=config.system.device,
-    )
+    predictor_wrapper = PredictorWrapper(device=config.system.device)
     manager = CameraManager(predictor_wrapper, config)
 
     # Lifespan handler
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         try:
-            # Create a task for manager.start to avoid blocking startup
-            # if it takes too long to initialize cameras or models
-            start_task = asyncio.create_task(asyncio.to_thread(manager.start))
             # Startup
             await init_db()
+            await manager.start()
 
             yield
+        except asyncio.CancelledError:
+            pass
         except Exception as e:
             logger.exception(f"Unknown error in lifespan: {e}")
         finally:
-            # Shutdown
-            logger.info("Stopping camera manager...")
-            await asyncio.to_thread(manager.stop)
-            # Cancel start task if it's still running
-            if not start_task.done():
-                start_task.cancel()
+            manager.stop()
 
     app = FastAPI(title="Paddle Detection API", lifespan=lifespan)
 
@@ -67,7 +59,7 @@ def create_app():
         allow_headers=["*"],
     )
 
-    api_router = create_router(config, manager)
+    api_router = create_router(config, manager, predictor_wrapper)
     app.include_router(api_router, prefix="/api")
 
     return app

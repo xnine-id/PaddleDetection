@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import threading
 import time
@@ -11,7 +12,8 @@ from internal.services.mqtt.base.mqtt_service_int import MQTTServiceInt
 from internal.services.trackers.stream.stream_fight_tracker import StreamFightTracker
 from internal.services.trackers.stream.stream_vehicle_plate_tracker import StreamVehiclePlateTracker
 from internal.services.trackers.base.tracker_int import TrackerInt
-from internal.utils.config_loader import CameraConfig, DetectionConfig, SystemConfig
+from internal.utils.config_loader import DetectionConfig, SystemConfig
+from internal.database.entity.camera import Camera
 
 logger = logging.getLogger("CameraProcessor")
 
@@ -23,40 +25,60 @@ class CameraProcessor:
     """
     def __init__(
         self,
-        cam_config: CameraConfig,
+        cam_config: Camera,
         detection_config: DetectionConfig,
         system_config: SystemConfig,
         predictor_wrapper: PredictorWrapper,
         mqtt_services: Dict[str, MQTTServiceInt],
         thread_idx: int,
-        stop_event: Event,
     ):
         self.cam_name = cam_config.name
         self.url = cam_config.url
-        self.is_running: bool = cam_config.enabled
+        self.fight_enabled: bool = cam_config.fight_enabled
+        self.vehicle_plate_enabled: bool = cam_config.vehicle_plate_enabled
+        self.is_running: bool = self.fight_enabled or self.vehicle_plate_enabled
+
         self.system_config = system_config
         self.thread_idx = thread_idx
-        self.stop_event = stop_event
+        self.stop_event = Event()
 
         self.mqtt_services = mqtt_services
         self.predictor_wrapper = predictor_wrapper
         self.detection_config = detection_config
 
         # Initialize trackers with their respective MQTT services
-        self.trackers: Dict[str, TrackerInt] = {
-            VIDEO_ACTION: StreamFightTracker(
+        self.trackers: Dict[str, TrackerInt] = {}
+
+        self.cfg_path = self.system_config.config_path
+        if self.fight_enabled and self.vehicle_plate_enabled:
+            self.cfg_path = self.system_config.config_path
+            self.trackers[VIDEO_ACTION] = StreamFightTracker(
                 snapshot_config=detection_config.fight.snapshot,
                 cam_name=self.cam_name,
                 mqtt_service=self.mqtt_services.get(VIDEO_ACTION),
-            ),
-            VEHICLE_PLATE: StreamVehiclePlateTracker(
+            )
+            self.trackers[VEHICLE_PLATE] = StreamVehiclePlateTracker(
                 snapshot_config=detection_config.vehicle_plate.snapshot,
                 cam_name=self.cam_name,
                 mqtt_service=self.mqtt_services.get(VEHICLE_PLATE),
-            ),
-        }
+            )
+        elif self.fight_enabled:
+            self.cfg_path = self.detection_config.fight.config_path
+            self.trackers[VIDEO_ACTION] = StreamFightTracker(
+                snapshot_config=detection_config.fight.snapshot,
+                cam_name=self.cam_name,
+                mqtt_service=self.mqtt_services.get(VIDEO_ACTION),
+            )
+        elif self.vehicle_plate_enabled:
+            self.cfg_path = self.detection_config.vehicle_plate.config_path
+            self.trackers[VEHICLE_PLATE] = StreamVehiclePlateTracker(
+                snapshot_config=detection_config.vehicle_plate.snapshot,
+                cam_name=self.cam_name,
+                mqtt_service=self.mqtt_services.get(VEHICLE_PLATE),
+            )
 
         self.predictor: PipePredictor = self.predictor_wrapper.predict_livestream(
+            cfg_path=self.cfg_path,
             cam_name=self.cam_name,
             rtsp_url=self.url,
             pushurl_prefix=self.system_config.pushurl_prefix,
@@ -65,20 +87,33 @@ class CameraProcessor:
         self.predictor_thread: Optional[threading.Thread] = None
 
         # Register camera with all MQTT services for command handling
-        for service in self.mqtt_services.values():
+        for action, service in self.mqtt_services.items():
+            is_running = False
+            if self.vehicle_plate_enabled and action == VEHICLE_PLATE:
+                is_running = True
+            elif self.fight_enabled and action == VIDEO_ACTION:
+                is_running = True
             service.register_camera(
-                self.cam_name, self.is_running, self._on_mqtt_command
+                self.cam_name, is_running, self._on_mqtt_command
             )
 
-    def _on_mqtt_command(self, payload: Dict[str, Any]):
+    def _on_mqtt_command(self, topic: str, payload: Dict[str, Any]):
         """Handle incoming MQTT commands for this camera"""
+
+        if topic.startswith(self.detection_config.fight.mqtt.command_topic_prefix):
+            action = VIDEO_ACTION
+        elif topic.startswith(self.detection_config.vehicle_plate.mqtt.command_topic_prefix):
+            action = VEHICLE_PLATE
+        else:
+            logger.warning(f"[{self.cam_name}] Unknown command topic: {topic}")
+            return
+
         run_status: Optional[bool] = payload.get("run")
-        logger.debug(f"run_status: {run_status}")
         if run_status is not None:
             if run_status:
-                self.start()
+                self.resume(action)
             else:
-                self.stop()
+                self.pause(action)
 
     def run(self):
         """
@@ -148,34 +183,108 @@ class CameraProcessor:
 
         logger.info(f"[{self.cam_name}] Main loop stopped")
 
-    def start(self):
-        if self.is_running:
-            return
+    def _recalculate_cfg_path(self):
+        """Recalculate cfg_path based on currently enabled actions, mirroring __init__ logic."""
+        if self.fight_enabled and self.vehicle_plate_enabled:
+            self.cfg_path = self.system_config.config_path
+        elif self.fight_enabled:
+            self.cfg_path = self.detection_config.fight.config_path
+        elif self.vehicle_plate_enabled:
+            self.cfg_path = self.detection_config.vehicle_plate.config_path
 
-        logger.info(f"[{self.cam_name}] Enabling camera processor status...")
+    def resume(self, action: str):
+        logger.info(f"[{self.cam_name}] Resuming action: {action}")
+
+        if action == VIDEO_ACTION:
+            self.fight_enabled = True
+        elif action == VEHICLE_PLATE:
+            self.vehicle_plate_enabled = True
+
+        self._recalculate_cfg_path()
         self.is_running = True
 
-        for service in self.mqtt_services.values():
-            service.publish_state(self.cam_name, self.is_running)
-        logger.info(f"[{self.cam_name}] Status changed to ENABLED")
+        service = self.mqtt_services.get(action)
+        if service:
+            service.publish_state(self.cam_name, True)
 
-    def stop(self):
-        if not self.is_running:
-            return
+        threading.Thread(
+            target=lambda: asyncio.run(self._persist_action_flag(action, True)),
+            daemon=True,
+        ).start()
 
-        logger.info(f"[{self.cam_name}] Disabling camera processor status...")
-        self.is_running = False
+        logger.info(f"[{self.cam_name}] Action '{action}' ENABLED")
 
-        # Stop predictor resources
-        self.predictor.stop()
+    def pause(self, action: str):
+        logger.info(f"[{self.cam_name}] Pausing action: {action}")
 
-        for tracker in self.trackers.values():
+        if action == VIDEO_ACTION:
+            self.fight_enabled = False
+        elif action == VEHICLE_PLATE:
+            self.vehicle_plate_enabled = False
+
+        # Reset only the affected tracker
+        tracker = self.trackers.get(action)
+        if tracker:
             tracker.reset()
 
-        # Note: predictor_thread will continue until its current run() call finishes.
-        # This usually happens when the stream is closed or an error occurs.
-        # We don't join here because it might block MQTT/API response if the stream is hanging.
+        self._recalculate_cfg_path()
+
+        # If no actions remain enabled, stop the predictor entirely
+        if not self.fight_enabled and not self.vehicle_plate_enabled:
+            self.is_running = False
+            self.predictor.stop()
+
+        service = self.mqtt_services.get(action)
+        if service:
+            service.publish_state(self.cam_name, False)
+
+        threading.Thread(
+            target=lambda: asyncio.run(self._persist_action_flag(action, False)),
+            daemon=True,
+        ).start()
+
+        logger.info(f"[{self.cam_name}] Action '{action}' DISABLED")
+
+    def stop(self):
+        self.stop_event.set()
+        self.predictor.stop()
 
         for service in self.mqtt_services.values():
-            service.publish_state(self.cam_name, self.is_running)
-        logger.info(f"[{self.cam_name}] Status changed to DISABLED")
+            service.publish_state(self.cam_name, False)
+
+        logger.info(f"[{self.cam_name}] Status changed to STOPPED")
+
+    async def _persist_action_flag(self, action: str, enabled: bool):
+        """Persist fight_enabled or vehicle_plate_enabled to the database."""
+        from internal.database.session import get_sessionmaker
+        from sqlalchemy.future import select
+
+        field = None
+        if action == VIDEO_ACTION:
+            field = "fight_enabled"
+        elif action == VEHICLE_PLATE:
+            field = "vehicle_plate_enabled"
+        else:
+            return
+
+        try:
+            session_factory = get_sessionmaker()
+            async with session_factory() as session:
+                result = await session.execute(
+                    select(Camera).where(Camera.name == self.cam_name)
+                )
+                camera = result.scalar_one_or_none()
+                if camera:
+                    setattr(camera, field, enabled)
+                    await session.commit()
+                    logger.info(
+                        f"[{self.cam_name}] DB updated: {field}={enabled}"
+                    )
+                else:
+                    logger.warning(
+                        f"[{self.cam_name}] Camera not found in DB, skipping persist"
+                    )
+        except Exception as e:
+            logger.exception(
+                f"[{self.cam_name}] Failed to persist {field}={enabled}: {e}"
+            )

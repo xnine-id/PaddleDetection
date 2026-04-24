@@ -1,12 +1,12 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import logging
 import sys
 import os
 import argparse
 import signal
 import threading
-from dotenv import load_dotenv
-
-load_dotenv()
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -33,10 +33,7 @@ def main():
 
     config = load_config(config_path)
 
-    predictor_wrapper = PredictorWrapper(
-        cfg_path=config.system.config_path,
-        device=config.system.device,
-    )
+    predictor_wrapper = PredictorWrapper(device=config.system.device)
     manager = CameraManager(predictor_wrapper, config)
     manager.start()
 

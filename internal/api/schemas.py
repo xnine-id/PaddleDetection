@@ -45,16 +45,16 @@ class JobStatusResponse(BaseModel):
 class AddCameraRequest(BaseModel):
     name: str = Field(description="Name of the camera")
     url: str = Field(description="URL of the camera stream")
-    detect_fps: int = Field(description="Frames per second for face detection")
-    is_enabled: bool = Field(description="Enable camera")
+    fight_enabled: bool = Field(description="Enable fight detection")
+    vehicle_plate_enabled: bool = Field(description="Enable vehicle plate detection")
     snapshot_enabled: bool = Field(description="Enable snapshot")
     mqtt_enabled: bool = Field(description="Enable MQTT")
 
 class UpdateCameraRequest(BaseModel):
     name: Optional[str] = Field(None, description="Name of the camera")
     url: Optional[str] = Field(None, description="URL of the camera stream")
-    detect_fps: Optional[int] = Field(None, description="Frames per second for face detection")
-    is_enabled: Optional[bool] = Field(None, description="Enable camera")
+    fight_enabled: Optional[bool] = Field(None, description="Enable fight detection")
+    vehicle_plate_enabled: Optional[bool] = Field(None, description="Enable vehicle plate detection")
     snapshot_enabled: Optional[bool] = Field(None, description="Enable snapshot")
     mqtt_enabled: Optional[bool] = Field(None, description="Enable MQTT")
 
@@ -62,8 +62,8 @@ class CameraResponse(BaseModel):
     id: int
     name: str
     url: str
-    detect_fps: int
-    is_enabled: bool
+    fight_enabled: bool
+    vehicle_plate_enabled: bool
     snapshot_enabled: bool
     mqtt_enabled: bool
 

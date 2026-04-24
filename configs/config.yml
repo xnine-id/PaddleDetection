@@ -26,8 +26,3 @@ detection:
       event_topic_prefix: "vehicle_plate_detection/events"
       command_topic_prefix: "vehicle_plate_detection/cmd"
       state_topic_prefix: "vehicle_plate_detection/state"
-
-cameras:
-  - name: "webcam1"
-    url: "rtsp://localhost:8554/input/webcam1"
-    enabled: true

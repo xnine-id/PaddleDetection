@@ -3,10 +3,12 @@ from sqlalchemy.future import select
 from internal.database.entity.camera import Camera
 from internal.api.schemas import AddCameraRequest, UpdateCameraRequest
 from typing import List, Optional
+from internal.core.camera_manager import CameraManager
 
 class CameraService:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, camera_manager: CameraManager):
         self.session = session
+        self.camera_manager = camera_manager
 
     async def get_cameras(self) -> List[Camera]:
         result = await self.session.execute(select(Camera))
@@ -20,34 +22,52 @@ class CameraService:
         new_camera = Camera(
             name=data.name,
             url=data.url,
-            detect_fps=data.detect_fps,
-            is_enabled=data.is_enabled,
+            fight_enabled=data.fight_enabled,
+            vehicle_plate_enabled=data.vehicle_plate_enabled,
             snapshot_enabled=data.snapshot_enabled,
             mqtt_enabled=data.mqtt_enabled
         )
         self.session.add(new_camera)
         await self.session.commit()
         await self.session.refresh(new_camera)
+
+        # Add to camera manager
+        self.camera_manager.add_camera_processor(new_camera)
+
         return new_camera
 
     async def update_camera(self, camera_id: int, data: UpdateCameraRequest) -> Optional[Camera]:
         camera = await self.get_camera(camera_id)
         if not camera:
             return None
-        
+
+        old_name = camera.name
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(camera, key, value)
         
         await self.session.commit()
         await self.session.refresh(camera)
+
+        # Update in camera manager
+        if old_name != camera.name:
+            self.camera_manager.remove_camera_processor(old_name)
+            self.camera_manager.add_camera_processor(camera)
+        else:
+            self.camera_manager.update_camera_processor(camera)
+
         return camera
 
     async def delete_camera(self, camera_id: int) -> bool:
         camera = await self.get_camera(camera_id)
         if not camera:
             return False
-        
+
+        cam_name = camera.name
         await self.session.delete(camera)
         await self.session.commit()
+
+        # Remove from camera manager
+        self.camera_manager.remove_camera_processor(cam_name)
+
         return True

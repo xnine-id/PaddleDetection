@@ -12,19 +12,18 @@ class PredictorWrapper:
     Initializes and configures the underlying pipeline logic for either 
     livestream (RTSP) or static video file predictions.
     """
-    def __init__(self, cfg_path: str, device: str):
-        self.cfg_path = cfg_path
+    def __init__(self, device: str):
         self.device = device
         print("================== paddle run check ========================")
         paddle.utils.run_check()
         print("================== paddle run check ========================")
 
     def predict_livestream(
-        self, cam_name: str, rtsp_url: str, pushurl_prefix: str, trackers: Dict[str, Any]
+        self, cfg_path: str, cam_name: str, rtsp_url: str, pushurl_prefix: str, trackers: Dict[str, Any]
     ):
         args = SimpleNamespace(
             # required
-            config=self.cfg_path,
+            config=cfg_path,
             # inputs (we feed RTSP directly to predictor.run)
             image_file=None,
             image_dir=None,
@@ -65,10 +64,10 @@ class PredictorWrapper:
         predictor.set_file_name(filename)
         return predictor
 
-    def predict_video(self, video_file: str, output_dir: str, trackers: Dict[str, Any]):
+    def predict_video(self, cfg_path: str, video_file: str, output_dir: str, trackers: Dict[str, Any]):
         args = SimpleNamespace(
             # required
-            config=self.cfg_path,
+            config=cfg_path,
             # inputs (we feed RTSP directly to predictor.run)
             image_file=None,
             image_dir=None,
@@ -109,10 +108,10 @@ class PredictorWrapper:
         predictor.set_file_name(filename)
         return predictor
 
-    def predict_images(self, image_dir: str, output_dir: str, trackers: Dict[str, Any]):
+    def predict_images(self, cfg_path: str, image_dir: str, output_dir: str, trackers: Dict[str, Any]):
         args = SimpleNamespace(
             # required
-            config=self.cfg_path,
+            config=cfg_path,
             # inputs (we feed RTSP directly to predictor.run)
             image_file=None,
             image_dir=image_dir,

@@ -1,7 +1,7 @@
 import yaml
 import os
 from dataclasses import dataclass
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 
 @dataclass
@@ -40,17 +40,9 @@ class SystemConfig:
 
 
 @dataclass
-class CameraConfig:
-    name: str
-    url: str
-    enabled: bool
-
-
-@dataclass
 class AppConfig:
     system: SystemConfig
     detection: DetectionConfig
-    cameras: List[CameraConfig]
 
 
 def validate_config(config: Dict[str, Any], required_keys: Dict[str, Any]) -> None:
@@ -100,7 +92,6 @@ REQUIRED_CONFIG = {
             },
         },
     },
-    "cameras": [{"name": str, "url": str, "enabled": bool}],
 }
 
 
@@ -130,5 +121,4 @@ def load_config(config_file: str) -> AppConfig:
                 config["detection"]["vehicle_plate"]
             ),
         ),
-        cameras=[CameraConfig(**cam) for cam in config["cameras"]],
     )

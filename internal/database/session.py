@@ -7,7 +7,7 @@ from internal.database.entity.camera import Camera
 from internal.database.entity.token import Token
 
 # URL default untuk SQLite (async)
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./database.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./storage/private/database.db")
 
 # Private variables untuk caching
 _engine: AsyncEngine = None

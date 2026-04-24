@@ -20,13 +20,9 @@ from internal.api.schemas import JobCreateResponse, JobStatusResponse
 
 logger = logging.getLogger("API_PREDICT")
 
-def get_predict_router(config: AppConfig):
+def get_predict_router(config: AppConfig, predictor_wrapper: PredictorWrapper):
     router = APIRouter(tags=["Predict"])
 
-    predictor_wrapper = {
-        VIDEO_ACTION: PredictorWrapper(config.detection.fight.config_path, device=config.system.device),
-        VEHICLE_PLATE: PredictorWrapper(config.detection.vehicle_plate.config_path, device=config.system.device),
-    }
     output_dir = config.system.output_dir
     jobs = {}
 
@@ -39,11 +35,6 @@ def get_predict_router(config: AppConfig):
                 status_code=500, detail="Output directory not configured"
             )
 
-        if action not in predictor_wrapper:
-            raise HTTPException(
-                status_code=400, detail=f"Predictor for action '{action}' not found"
-            )
-
         basename = str(uuid.uuid4())
 
         # Ensure output directory exists
@@ -52,7 +43,14 @@ def get_predict_router(config: AppConfig):
 
         def _run_pred():
             # Run prediction
-            predictor = predictor_wrapper[action].predict_video(
+            cfg_path = config.system.config_path
+            if action == VIDEO_ACTION:
+                cfg_path = config.detection.fight.config_path
+            elif action == VEHICLE_PLATE:
+                cfg_path = config.detection.vehicle_plate.config_path
+
+            predictor = predictor_wrapper.predict_video(
+                cfg_path=cfg_path,
                 video_file=temp_input,
                 output_dir=output_dir,
                 trackers={action: tracker},
@@ -119,18 +117,20 @@ def get_predict_router(config: AppConfig):
             raise HTTPException(
                 status_code=500, detail="Output directory not configured"
             )
-
-        if action not in predictor_wrapper:
-            raise HTTPException(
-                status_code=400, detail=f"Predictor for action '{action}' not found"
-            )
         # Ensure output directory exists
         if not os.path.exists(output_dir):
             os.makedirs(output_dir, exist_ok=True)
 
         def _run_pred():
             # Run prediction
-            predictor = predictor_wrapper[action].predict_image(
+            cfg_path = config.system.config_path
+            if action == VIDEO_ACTION:
+                cfg_path = config.detection.fight.config_path
+            elif action == VEHICLE_PLATE:
+                cfg_path = config.detection.vehicle_plate.config_path
+
+            predictor = predictor_wrapper.predict_image(
+                cfg_path=cfg_path,
                 image_file=temp_input,
                 output_dir=output_dir,
                 trackers={action: tracker},
@@ -153,7 +153,7 @@ def get_predict_router(config: AppConfig):
 
         return output_filename
 
-    async def bg_predict_video_action(job_id: str, action: str, temp_input: str, original_filename: str):
+    async def bg_predict_video(job_id: str, action: str, temp_input: str, original_filename: str):
         jobs[job_id] = {"status": "processing"}
 
         try:
@@ -182,7 +182,7 @@ def get_predict_router(config: AppConfig):
             if os.path.exists(temp_input):
                 os.remove(temp_input)
 
-    async def bg_predict_image_action(job_id: str, action: str, temp_input: str, original_filename: str):
+    async def bg_predict_image(job_id: str, action: str, temp_input: str, original_filename: str):
         jobs[job_id] = {"status": "processing"}
         try:
             tracker = ImagesVehiclePlateTracker()
@@ -233,7 +233,7 @@ def get_predict_router(config: AppConfig):
         job_id = str(uuid.uuid4())
         jobs[job_id] = {"status": "pending"}
 
-        background_tasks.add_task(bg_predict_video_action, job_id, VIDEO_ACTION, temp_input, file.filename)
+        background_tasks.add_task(bg_predict_video, job_id, VIDEO_ACTION, temp_input, file.filename)
 
         return {"message": "Job created", "data": {"job_id": job_id}}
 
@@ -255,7 +255,7 @@ def get_predict_router(config: AppConfig):
         job_id = str(uuid.uuid4())
         jobs[job_id] = {"status": "pending"}
 
-        background_tasks.add_task(bg_predict_video_action, job_id, VEHICLE_PLATE, temp_input, file.filename)
+        background_tasks.add_task(bg_predict_video, job_id, VEHICLE_PLATE, temp_input, file.filename)
 
         return {"message": "Job created", "data": {"job_id": job_id}}
 
@@ -277,7 +277,7 @@ def get_predict_router(config: AppConfig):
         job_id = str(uuid.uuid4())
         jobs[job_id] = {"status": "pending"}
 
-        background_tasks.add_task(bg_predict_image_action, job_id, VEHICLE_PLATE, temp_input, file.filename)
+        background_tasks.add_task(bg_predict_image, job_id, VEHICLE_PLATE, temp_input, file.filename)
 
         return {"message": "Job created", "data": {"job_id": job_id}}
 
