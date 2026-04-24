@@ -46,45 +46,11 @@ class CameraProcessor:
         self.predictor_wrapper = predictor_wrapper
         self.detection_config = detection_config
 
-        # Initialize trackers with their respective MQTT services
-        self.trackers: Dict[str, TrackerInt] = {}
-
-        self.cfg_path = self.system_config.config_path
-        if self.fight_enabled and self.vehicle_plate_enabled:
-            self.cfg_path = self.system_config.config_path
-            self.trackers[VIDEO_ACTION] = StreamFightTracker(
-                snapshot_config=detection_config.fight.snapshot,
-                cam_name=self.cam_name,
-                mqtt_service=self.mqtt_services.get(VIDEO_ACTION),
-            )
-            self.trackers[VEHICLE_PLATE] = StreamVehiclePlateTracker(
-                snapshot_config=detection_config.vehicle_plate.snapshot,
-                cam_name=self.cam_name,
-                mqtt_service=self.mqtt_services.get(VEHICLE_PLATE),
-            )
-        elif self.fight_enabled:
-            self.cfg_path = self.detection_config.fight.config_path
-            self.trackers[VIDEO_ACTION] = StreamFightTracker(
-                snapshot_config=detection_config.fight.snapshot,
-                cam_name=self.cam_name,
-                mqtt_service=self.mqtt_services.get(VIDEO_ACTION),
-            )
-        elif self.vehicle_plate_enabled:
-            self.cfg_path = self.detection_config.vehicle_plate.config_path
-            self.trackers[VEHICLE_PLATE] = StreamVehiclePlateTracker(
-                snapshot_config=detection_config.vehicle_plate.snapshot,
-                cam_name=self.cam_name,
-                mqtt_service=self.mqtt_services.get(VEHICLE_PLATE),
-            )
-
-        self.predictor: PipePredictor = self.predictor_wrapper.predict_livestream(
-            cfg_path=self.cfg_path,
-            cam_name=self.cam_name,
-            rtsp_url=self.url,
-            pushurl_prefix=self.system_config.pushurl_prefix,
-            trackers=self.trackers,
-        )
+        self.cfg_path = self._calculate_cfg_path()
+        self.trackers: Dict[str, TrackerInt] = self._calculate_trackers()
+        self.predictor: PipePredictor = self._init_predictor()
         self.predictor_thread: Optional[threading.Thread] = None
+        self._needs_restart = False
 
         # Register camera with all MQTT services for command handling
         for action, service in self.mqtt_services.items():
@@ -96,6 +62,51 @@ class CameraProcessor:
             service.register_camera(
                 self.cam_name, is_running, self._on_mqtt_command
             )
+
+    def _init_predictor(self):
+        predictor = self.predictor_wrapper.predict_livestream(
+            cfg_path=self.cfg_path,
+            cam_name=self.cam_name,
+            rtsp_url=self.url,
+            pushurl_prefix=self.system_config.pushurl_prefix,
+            trackers=self.trackers,
+        )
+
+        return predictor
+
+    def _calculate_trackers(self):
+        trackers: Dict[str, TrackerInt] = {}
+        if self.fight_enabled:
+            trackers[VIDEO_ACTION] = self._init_fight_tracker()
+        if self.vehicle_plate_enabled:
+            trackers[VEHICLE_PLATE] = self._init_vehicle_tracker()
+
+        return trackers
+
+    def _init_vehicle_tracker(self):
+        return StreamVehiclePlateTracker(
+            snapshot_config=self.detection_config.vehicle_plate.snapshot,
+            cam_name=self.cam_name,
+            mqtt_service=self.mqtt_services.get(VEHICLE_PLATE),
+        )
+
+    def _init_fight_tracker(self):
+        return StreamFightTracker(
+            snapshot_config=self.detection_config.fight.snapshot,
+            cam_name=self.cam_name,
+            mqtt_service=self.mqtt_services.get(VIDEO_ACTION),
+        )
+
+    def _calculate_cfg_path(self):
+        """Recalculate cfg_path based on currently enabled actions, mirroring __init__ logic."""
+        if self.fight_enabled and self.vehicle_plate_enabled:
+            return self.system_config.config_path
+        elif self.fight_enabled:
+            return self.detection_config.fight.config_path
+        elif self.vehicle_plate_enabled:
+            return self.detection_config.vehicle_plate.config_path
+
+        return ""
 
     def _on_mqtt_command(self, topic: str, payload: Dict[str, Any]):
         """Handle incoming MQTT commands for this camera"""
@@ -124,6 +135,28 @@ class CameraProcessor:
         logger.info(f"[{self.cam_name}] Starting main loop for camera processor...")
 
         while not self.stop_event.is_set():
+            if self._needs_restart:
+                self._needs_restart = False
+                logger.info(f"[{self.cam_name}] Restarting predictor due to configuration change...")
+                if self.predictor_thread is not None:
+                    self.predictor.stop()
+                    if self.predictor_thread.is_alive():
+                        self.predictor_thread.join(timeout=2)
+                
+                if self.is_running:
+                    self.predictor = self._init_predictor()
+                    self.predictor.last_update_time = time.time()
+                    self.predictor_thread = threading.Thread(
+                        target=self.predictor.run,
+                        args=(self.url, self.thread_idx),
+                        daemon=True,
+                    )
+                    self.predictor_thread.start()
+                else:
+                    self.predictor_thread = None
+
+                continue
+
             if self.is_running:
                 # 1. Check if predictor thread is dead
                 thread_is_alive = (
@@ -178,19 +211,14 @@ class CameraProcessor:
             else:
                 # If we are not supposed to be running, but thread is still alive,
                 # we just wait for it to die (it should die if stream is closed or predictor returns)
-                # Note: We can't easily force-kill a thread in Python
+                if self.predictor_thread is not None:
+                    if self.predictor_thread.is_alive():
+                        self.predictor.stop()
+                        self.predictor_thread.join(timeout=2)
+                    self.predictor_thread = None
                 time.sleep(1)
 
         logger.info(f"[{self.cam_name}] Main loop stopped")
-
-    def _recalculate_cfg_path(self):
-        """Recalculate cfg_path based on currently enabled actions, mirroring __init__ logic."""
-        if self.fight_enabled and self.vehicle_plate_enabled:
-            self.cfg_path = self.system_config.config_path
-        elif self.fight_enabled:
-            self.cfg_path = self.detection_config.fight.config_path
-        elif self.vehicle_plate_enabled:
-            self.cfg_path = self.detection_config.vehicle_plate.config_path
 
     def resume(self, action: str):
         logger.info(f"[{self.cam_name}] Resuming action: {action}")
@@ -200,8 +228,15 @@ class CameraProcessor:
         elif action == VEHICLE_PLATE:
             self.vehicle_plate_enabled = True
 
-        self._recalculate_cfg_path()
+        if action == VIDEO_ACTION and not action in self.trackers:
+            self.trackers[action] = self._init_fight_tracker()
+        elif action == VEHICLE_PLATE and not action in self.trackers:
+            self.trackers[action] = self._init_vehicle_tracker()
+
+        self.cfg_path = self._calculate_cfg_path()
         self.is_running = True
+
+        self._needs_restart = True
 
         service = self.mqtt_services.get(action)
         if service:
@@ -226,13 +261,15 @@ class CameraProcessor:
         tracker = self.trackers.get(action)
         if tracker:
             tracker.reset()
+            del self.trackers[action]
 
-        self._recalculate_cfg_path()
+        self.cfg_path = self._calculate_cfg_path()
 
         # If no actions remain enabled, stop the predictor entirely
         if not self.fight_enabled and not self.vehicle_plate_enabled:
             self.is_running = False
-            self.predictor.stop()
+
+        self._needs_restart = True
 
         service = self.mqtt_services.get(action)
         if service:
