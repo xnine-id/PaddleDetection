@@ -19,7 +19,7 @@ from internal.core.camera_manager import CameraManager
 from internal.core.predictor_wrapper import PredictorWrapper
 from internal.utils.config_loader import load_config
 from internal.utils.logging_utils import setup_logging
-from internal.database.session import init_db
+from internal.database.session import init_db, close_db
 
 logger = logging.getLogger("API")
 
@@ -48,6 +48,7 @@ def create_app():
             logger.exception(f"Unknown error in lifespan: {e}")
         finally:
             manager.stop()
+            await close_db()
 
     app = FastAPI(title="Paddle Detection API", lifespan=lifespan)
 

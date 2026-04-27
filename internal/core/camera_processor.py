@@ -48,7 +48,7 @@ class CameraProcessor:
 
         self.cfg_path = self._calculate_cfg_path()
         self.trackers: Dict[str, TrackerInt] = self._calculate_trackers()
-        self.predictor: PipePredictor = self._init_predictor()
+        self.predictor: Optional[PipePredictor] = self._init_predictor() if self.is_running else None
         self.predictor_thread: Optional[threading.Thread] = None
         self._needs_restart = False
 
@@ -106,7 +106,7 @@ class CameraProcessor:
         elif self.vehicle_plate_enabled:
             return self.detection_config.vehicle_plate.config_path
 
-        return ""
+        return self.system_config.config_path
 
     def _on_mqtt_command(self, topic: str, payload: Dict[str, Any]):
         """Handle incoming MQTT commands for this camera"""
@@ -139,7 +139,8 @@ class CameraProcessor:
                 self._needs_restart = False
                 logger.info(f"[{self.cam_name}] Restarting predictor due to configuration change...")
                 if self.predictor_thread is not None:
-                    self.predictor.stop()
+                    if self.predictor:
+                        self.predictor.stop()
                     if self.predictor_thread.is_alive():
                         self.predictor_thread.join(timeout=2)
                 
@@ -189,7 +190,8 @@ class CameraProcessor:
                         logger.info(
                             f"[{self.cam_name}] Stopping existing predictor resources..."
                         )
-                        self.predictor.stop()
+                        if self.predictor:
+                            self.predictor.stop()
 
                         # Wait a bit for the thread to exit if it's not totally hung
                         if self.predictor_thread.is_alive():
@@ -213,7 +215,8 @@ class CameraProcessor:
                 # we just wait for it to die (it should die if stream is closed or predictor returns)
                 if self.predictor_thread is not None:
                     if self.predictor_thread.is_alive():
-                        self.predictor.stop()
+                        if self.predictor:
+                            self.predictor.stop()
                         self.predictor_thread.join(timeout=2)
                     self.predictor_thread = None
                 time.sleep(1)
@@ -284,7 +287,8 @@ class CameraProcessor:
 
     def stop(self):
         self.stop_event.set()
-        self.predictor.stop()
+        if self.predictor:
+            self.predictor.stop()
 
         for service in self.mqtt_services.values():
             service.publish_state(self.cam_name, False)
