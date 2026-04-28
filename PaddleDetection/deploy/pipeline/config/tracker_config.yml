@@ -2,7 +2,7 @@
 # The tracker of MOT JDE Detector (such as FairMOT) is exported together with the model.
 # Here 'min_box_area' and 'vertical_ratio' are set for pedestrian, you can modify for other objects tracking.
 
-type: BOTSORTTracker # choose one tracker in ['JDETracker', 'OCSORTTracker', 'DeepSORTTracker','BOTSORTTracker']
+type: JDETracker # choose one tracker in ['JDETracker', 'OCSORTTracker', 'DeepSORTTracker','BOTSORTTracker']
 # When using for MTMCT(Multi-Target Multi-Camera Tracking), you should modify to 'DeepSORTTracker'
 
 
