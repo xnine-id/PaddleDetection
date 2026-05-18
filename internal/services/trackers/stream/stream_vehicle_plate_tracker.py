@@ -37,6 +37,7 @@ class StreamVehiclePlateTracker(TrackerInt):
         self.last_seen_vehicles: Dict[int, datetime] = {}
         self.last_cleanup = datetime.now()
 
+        # format: {<vehicle_id>: {"plates": ["plate1", "plate2"], "scores": [0.8, 0.9], "best_plate": "plate1", "best_score": 0.9}}
         self.results: Dict[int, Dict[str, Any]] = {}
 
     def update(
@@ -86,9 +87,9 @@ class StreamVehiclePlateTracker(TrackerInt):
 
                     counter = Counter(old_plates)
                     carlp = counter.most_common()
-                    
+
                     current_best_plate = carlp[0][0] if carlp else plate
-                    
+
                     # Find max score for the current best plate
                     max_scores = {}
                     for p, s in zip(old_plates, old_scores):
@@ -110,7 +111,7 @@ class StreamVehiclePlateTracker(TrackerInt):
                     # New vehicle discovery
                     current_best_plate = plate
                     current_best_score = score
-                    
+
                     self.results[vehicle_id] = {
                         "plates": [plate],
                         "scores": [score],
