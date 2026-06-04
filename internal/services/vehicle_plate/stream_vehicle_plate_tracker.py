@@ -143,7 +143,8 @@ class StreamVehiclePlateTracker(TrackerInt):
                         confidence=event["score"],
                         snapshot=snapshot,
                         event_type=event["event_type"],
-                        metadata={"plate": event["plate"], "vehicle_id": event["vehicle_id"]},
+                        plate=event["plate"],
+                        vehicle_id=event["vehicle_id"],
                     )
 
         threading.Thread(target=mqtt_task, args=(frame.copy(),), daemon=True).start()

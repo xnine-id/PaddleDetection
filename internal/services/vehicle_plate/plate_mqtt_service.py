@@ -20,9 +20,10 @@ class PlateMQTTService(MQTTServiceInt):
         event_id: str,
         cam_name: str,
         confidence: float,
-        snapshot: Optional[str] = None,
-        event_type: str = "enter",
-        metadata: Optional[Dict[str, Any]] = None,
+        snapshot: Optional[str],
+        event_type: str,
+        plate: str,
+        vehicle_id: int,
     ):
         if not self.client:
             return
@@ -34,10 +35,9 @@ class PlateMQTTService(MQTTServiceInt):
             "timestamp": datetime.now().isoformat(),
             "event": event_type,
             "snapshot": snapshot,
+            "plate": plate,
+            "vehicle_id": vehicle_id,
         }
-
-        if metadata:
-            payload["metadata"] = metadata
 
         topic = f"{self.event_topic}/{cam_name}"
         self.client.publish(topic, json.dumps(payload), qos=1)
