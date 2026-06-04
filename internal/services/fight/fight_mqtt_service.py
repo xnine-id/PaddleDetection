@@ -22,7 +22,6 @@ class FightMQTTService(MQTTServiceInt):
         confidence: float,
         snapshot: Optional[str] = None,
         event_type: str = "fight",
-        metadata: Optional[Dict[str, Any]] = None,
     ):
         if not self.client:
             return
@@ -35,9 +34,6 @@ class FightMQTTService(MQTTServiceInt):
             "event": event_type,
             "snapshot": snapshot
         }
-
-        if metadata:
-            payload["metadata"] = metadata
 
         topic = f"{self.event_topic}/{cam_name}"
         self.client.publish(topic, json.dumps(payload), qos=1)

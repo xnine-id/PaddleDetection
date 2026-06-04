@@ -54,10 +54,10 @@ class StreamFightTracker(TrackerInt):
 
             if is_fight:
                 self.last_fight_time = now
+                event_type = "fight"
                 if is_new_event:
                     self.event_id = str(uuid.uuid4())
                     should_save_snapshot = True
-                    event_type = "fight"
             else:
                 if is_new_event:
                     self.event_id = str(uuid.uuid4())
@@ -79,7 +79,9 @@ class StreamFightTracker(TrackerInt):
                         event_type=event_type,
                     )
 
-            threading.Thread(target=mqtt_task, args=(frame.copy(),), daemon=True).start()
+            # Send mqtt event every new event and fight event (for update score)
+            if is_new_event or is_fight:
+                threading.Thread(target=mqtt_task, args=(frame.copy(),), daemon=True).start()
 
     def reset(self):
         """Reset internal state of the tracker"""

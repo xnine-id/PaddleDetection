@@ -81,7 +81,7 @@ class MQTTServiceInt(ABC):
         confidence: float,
         snapshot: Optional[str] = None,
         event_type: str = "fight",
-        metadata: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ):
         """Publish detection event"""
         pass

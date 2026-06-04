@@ -56,7 +56,7 @@ class StreamVehiclePlateTracker(TrackerInt):
 
         # Get scores for each detected plates safely
         mot_res = result.get("mot", {}) or {}
-        boxes = mot_res.get("boxes")
+        boxes = mot_res.get("boxes", [])
         plates_list: List[str] = (result.get("vehicleplate", {}) or {}).get("plate", [])
 
         should_save_snapshot = False
