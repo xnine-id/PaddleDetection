@@ -12,7 +12,7 @@ class CameraService:
 
     async def get_cameras(self) -> List[Camera]:
         result = await self.session.execute(select(Camera))
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def get_camera(self, camera_name: str) -> Optional[Camera]:
         result = await self.session.execute(select(Camera).where(Camera.name == camera_name))
@@ -24,8 +24,6 @@ class CameraService:
             url=data.url,
             fight_enabled=data.fight_enabled,
             vehicle_plate_enabled=data.vehicle_plate_enabled,
-            snapshot_enabled=data.snapshot_enabled,
-            mqtt_enabled=data.mqtt_enabled
         )
         self.session.add(new_camera)
         await self.session.commit()
@@ -88,8 +86,6 @@ class CameraService:
                 camera.url = item.url
                 camera.fight_enabled = item.fight_enabled
                 camera.vehicle_plate_enabled = item.vehicle_plate_enabled
-                camera.snapshot_enabled = item.snapshot_enabled
-                camera.mqtt_enabled = item.mqtt_enabled
                 
                 # Update in camera manager
                 self.camera_manager.update_camera_processor(camera)
@@ -101,8 +97,6 @@ class CameraService:
                     url=item.url,
                     fight_enabled=item.fight_enabled,
                     vehicle_plate_enabled=item.vehicle_plate_enabled,
-                    snapshot_enabled=item.snapshot_enabled,
-                    mqtt_enabled=item.mqtt_enabled
                 )
                 self.session.add(new_camera)
                 # We'll commit and refresh later to get IDs

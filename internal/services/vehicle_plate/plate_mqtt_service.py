@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, override
 
 from internal.utils.config_loader import MQTTConfig
 from internal.services.base.mqtt_service_int import MQTTServiceInt
@@ -15,15 +15,17 @@ class PlateMQTTService(MQTTServiceInt):
     def __init__(self, config: MQTTConfig):
         super().__init__(config, service_name="PlateMQTT")
 
+    @override
     def publish_event(
         self,
         event_id: str,
         cam_name: str,
         confidence: float,
-        snapshot: Optional[str],
-        event_type: str,
-        plate: str,
-        vehicle_id: int,
+        snapshot: Optional[str] = None,
+        event_type: str = "vehicle_plate",
+        plate: str = "",
+        vehicle_id: int = -1,
+        **kwargs: Any,
     ):
         if not self.client:
             return

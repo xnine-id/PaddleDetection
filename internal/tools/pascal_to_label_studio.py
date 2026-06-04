@@ -14,20 +14,52 @@ for file in os.listdir(annotations_dir):
     tree = ET.parse(os.path.join(annotations_dir, file))
     root = tree.getroot()
 
-    filename = root.find("filename").text
-    width = int(root.find("size/width").text)
-    height = int(root.find("size/height").text)
+    filename_elem = root.find("filename")
+    width_elem = root.find("size/width")
+    height_elem = root.find("size/height")
+    if filename_elem is None or width_elem is None or height_elem is None:
+        continue
+
+    filename = filename_elem.text
+    if filename is None:
+        continue
+    
+    width_text = width_elem.text
+    height_text = height_elem.text
+    if width_text is None or height_text is None:
+        continue
+    width = int(width_text)
+    height = int(height_text)
 
     results = []
 
     for obj in root.findall("object"):
-        label = obj.find("name").text
+        name_elem = obj.find("name")
         bbox = obj.find("bndbox")
+        if name_elem is None or bbox is None:
+            continue
+        label = name_elem.text
+        if label is None:
+            continue
 
-        xmin = int(bbox.find("xmin").text)
-        ymin = int(bbox.find("ymin").text)
-        xmax = int(bbox.find("xmax").text)
-        ymax = int(bbox.find("ymax").text)
+        xmin_elem = bbox.find("xmin")
+        ymin_elem = bbox.find("ymin")
+        xmax_elem = bbox.find("xmax")
+        ymax_elem = bbox.find("ymax")
+        if xmin_elem is None or ymin_elem is None or xmax_elem is None or ymax_elem is None:
+            continue
+
+        xmin_text = xmin_elem.text
+        ymin_text = ymin_elem.text
+        xmax_text = xmax_elem.text
+        ymax_text = ymax_elem.text
+        if xmin_text is None or ymin_text is None or xmax_text is None or ymax_text is None:
+            continue
+
+        xmin = int(xmin_text)
+        ymin = int(ymin_text)
+        xmax = int(xmax_text)
+        ymax = int(ymax_text)
 
         results.append({
             "from_name": "label",

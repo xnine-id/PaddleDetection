@@ -1,3 +1,4 @@
+from typing import Any
 from internal.api.middleware.auth import verify_token
 from fastapi.param_functions import Depends
 from fastapi.responses import FileResponse
@@ -15,6 +16,7 @@ from internal.core.predictor_wrapper import PredictorWrapper
 from internal.services.vehicle_plate.images_vehicle_plate_tracker import ImagesVehiclePlateTracker
 from internal.services.vehicle_plate.video_vehicle_plate_tracker import VideoVehiclePlateTracker
 from internal.services.fight.video_fight_tracker import VideoFightTracker
+from internal.services.base.tracker_int import TrackerInt
 from internal.utils.config_loader import AppConfig
 from internal.api.schemas import JobCreateResponse, JobStatusResponse
 
@@ -24,9 +26,9 @@ def get_predict_router(config: AppConfig, predictor_wrapper: PredictorWrapper):
     router = APIRouter(tags=["Predict"])
 
     output_dir = config.system.output_dir
-    jobs = {}
+    jobs: dict[str, dict[str, Any]] = {}
 
-    async def _process_video_prediction(action: str, temp_input: str, original_filename: str, tracker):
+    async def _process_video_prediction(action: str, temp_input: str, original_filename: str, tracker: TrackerInt):
         """
         Helper to handle common video upload, prediction run, and FFmpeg conversion.
         """
@@ -109,7 +111,7 @@ def get_predict_router(config: AppConfig, predictor_wrapper: PredictorWrapper):
 
         return output_filename
 
-    async def _process_image_prediction(action: str, temp_input: str, original_filename: str, tracker):
+    async def _process_image_prediction(action: str, temp_input: str, original_filename: str, tracker: ImagesVehiclePlateTracker):
         """
         Helper to handle common image upload, prediction run.
         """
@@ -160,8 +162,8 @@ def get_predict_router(config: AppConfig, predictor_wrapper: PredictorWrapper):
             tracker = VideoFightTracker() if action == VIDEO_ACTION else VideoVehiclePlateTracker()
             output_filename = await _process_video_prediction(action, temp_input, original_filename, tracker)
 
-            result_data = {"filename": output_filename, "url": f"/api/result/{output_filename}"}
-            if action == VIDEO_ACTION:
+            result_data: dict[str, Any] = {"filename": output_filename, "url": f"/api/result/{output_filename}"}
+            if action == VIDEO_ACTION and isinstance(tracker, VideoFightTracker):
                 result_data["detections"] = {
                     'fight_detected': len(tracker.get_scores()) > 0,
                     "max_score": tracker.get_highest_score(),
@@ -169,7 +171,7 @@ def get_predict_router(config: AppConfig, predictor_wrapper: PredictorWrapper):
                     "avg_score": tracker.get_avg_scores(),
                     "fight_frequency": tracker.get_frequency(),
                 }
-            else:
+            elif isinstance(tracker, VideoVehiclePlateTracker):
                 result_data["detections"] = tracker.get_all_predictions()
 
             jobs[job_id]["status"] = "completed"
@@ -233,7 +235,7 @@ def get_predict_router(config: AppConfig, predictor_wrapper: PredictorWrapper):
         job_id = str(uuid.uuid4())
         jobs[job_id] = {"status": "pending"}
 
-        background_tasks.add_task(bg_predict_video, job_id, VIDEO_ACTION, temp_input, file.filename)
+        background_tasks.add_task(bg_predict_video, job_id, VIDEO_ACTION, temp_input, file.filename or "")
 
         return {"message": "Job created", "data": {"job_id": job_id}}
 
@@ -255,7 +257,7 @@ def get_predict_router(config: AppConfig, predictor_wrapper: PredictorWrapper):
         job_id = str(uuid.uuid4())
         jobs[job_id] = {"status": "pending"}
 
-        background_tasks.add_task(bg_predict_video, job_id, VEHICLE_PLATE, temp_input, file.filename)
+        background_tasks.add_task(bg_predict_video, job_id, VEHICLE_PLATE, temp_input, file.filename or "")
 
         return {"message": "Job created", "data": {"job_id": job_id}}
 
@@ -277,7 +279,7 @@ def get_predict_router(config: AppConfig, predictor_wrapper: PredictorWrapper):
         job_id = str(uuid.uuid4())
         jobs[job_id] = {"status": "pending"}
 
-        background_tasks.add_task(bg_predict_image, job_id, VEHICLE_PLATE, temp_input, file.filename)
+        background_tasks.add_task(bg_predict_image, job_id, VEHICLE_PLATE, temp_input, file.filename or "")
 
         return {"message": "Job created", "data": {"job_id": job_id}}
 

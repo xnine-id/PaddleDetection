@@ -1,3 +1,4 @@
+from typing import override
 import logging
 import os
 import sys
@@ -14,6 +15,7 @@ class ColorFormatter(logging.Formatter):
     }
     RESET = "\033[0m"
 
+    @override
     def format(self, record: logging.LogRecord) -> str:
         original = record.levelname
         try:

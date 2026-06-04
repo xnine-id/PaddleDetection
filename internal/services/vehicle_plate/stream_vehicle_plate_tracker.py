@@ -1,3 +1,4 @@
+from typing import override
 from typing import Any
 from collections import Counter
 import logging
@@ -40,8 +41,9 @@ class StreamVehiclePlateTracker(TrackerInt):
         # format: {<vehicle_id>: {"plates": ["plate1", "plate2"], "scores": [0.8, 0.9], "best_plate": "plate1", "best_score": 0.9}}
         self.results: Dict[int, Dict[str, Any]] = {}
 
+    @override
     def update(
-        self, result: dict, frame: np.ndarray, frame_ids: Optional[List[int]] = None
+        self, result: dict[str, Any], frame: np.ndarray[Any, Any], frame_ids: Optional[List[int]] = None
     ):
         """
         Update the tracker with vehicle plate detection results.
@@ -60,7 +62,7 @@ class StreamVehiclePlateTracker(TrackerInt):
         plates_list: List[str] = (result.get("vehicleplate", {}) or {}).get("plate", [])
 
         should_save_snapshot = False
-        mqtt_events_to_send = []
+        mqtt_events_to_send: List[Dict[str, Any]] = []
 
         for idx, box in enumerate(boxes):
             vehicle_id = int(box[0])
@@ -91,7 +93,7 @@ class StreamVehiclePlateTracker(TrackerInt):
                     current_best_plate = carlp[0][0] if carlp else plate
 
                     # Find max score for the current best plate
-                    max_scores = {}
+                    max_scores: dict[str, float] = {}
                     for p, s in zip(old_plates, old_scores):
                         if p == current_best_plate and (p not in max_scores or s > max_scores[p]):
                             max_scores[p] = s
@@ -115,8 +117,8 @@ class StreamVehiclePlateTracker(TrackerInt):
                     self.results[vehicle_id] = {
                         "plates": [plate],
                         "scores": [score],
-                        "best_plate": current_best_plate,
-                        "best_score": current_best_score,
+                        "best_plate": plate,
+                        "best_score": score,
                     }
                     event_type = "enter"
                     should_save_snapshot = True
@@ -129,7 +131,7 @@ class StreamVehiclePlateTracker(TrackerInt):
                         "score": current_best_score
                     })
 
-        def mqtt_task(frame: np.ndarray):
+        def mqtt_task(frame: np.ndarray[Any, Any]):
             snapshot = None
             if should_save_snapshot and self.snapshot_enabled:
                 snapshot = self._save_snapshot(frame)
@@ -140,16 +142,16 @@ class StreamVehiclePlateTracker(TrackerInt):
                     self.mqtt_service.publish_event(
                         event_id=event_id,
                         cam_name=self.cam_name,
-                        confidence=event["score"],
+                        confidence=float(event["score"]),
                         snapshot=snapshot,
-                        event_type=event["event_type"],
-                        plate=event["plate"],
-                        vehicle_id=event["vehicle_id"],
+                        event_type=str(event["event_type"]),
+                        plate=str(event["plate"]),
+                        vehicle_id=int(event["vehicle_id"]),
                     )
 
         threading.Thread(target=mqtt_task, args=(frame.copy(),), daemon=True).start()
 
-
+    @override
     def reset(self):
         """Reset the vehicle plate tracker state."""
         self.last_seen_vehicles.clear()
@@ -166,7 +168,7 @@ class StreamVehiclePlateTracker(TrackerInt):
             if vid in self.results:
                 del self.results[vid]
 
-    def _save_snapshot(self, frame: np.ndarray):
+    def _save_snapshot(self, frame: np.ndarray[Any, Any]):
         """Save snapshot in a separate thread to avoid blocking"""
         today = datetime.now().strftime("%Y-%m-%d")
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:19] # include ms
@@ -179,7 +181,7 @@ class StreamVehiclePlateTracker(TrackerInt):
             final_output = os.path.join(
                 final_output_dir, f"{self.cam_name}_{timestamp}.jpg"
             )
-            cv2.imwrite(final_output, frame)
+            cv2.imwrite(final_output, frame)  # type: ignore
         except Exception as e:
             logger.exception(f"[{self.cam_name}] Failed to save snapshot: {e}")
             return None

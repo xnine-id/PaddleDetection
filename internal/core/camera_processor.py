@@ -167,7 +167,7 @@ class CameraProcessor:
 
                 # 2. Check if predictor is stuck (no heartbeat for > 15 seconds)
                 is_stuck = False
-                if thread_is_alive:
+                if thread_is_alive and self.predictor is not None:
                     time_since_last_update = (
                         time.time() - self.predictor.last_update_time
                     )
@@ -199,14 +199,15 @@ class CameraProcessor:
 
                     logger.info(f"[{self.cam_name}] Connecting to camera: {self.url}")
                     # Reset heartbeat before starting
-                    self.predictor.last_update_time = time.time()
+                    if self.predictor is not None:
+                        self.predictor.last_update_time = time.time()
 
-                    self.predictor_thread = threading.Thread(
-                        target=self.predictor.run,
-                        args=(self.url, self.thread_idx),
-                        daemon=True,
-                    )
-                    self.predictor_thread.start()
+                        self.predictor_thread = threading.Thread(
+                            target=self.predictor.run,
+                            args=(self.url, self.thread_idx),
+                            daemon=True,
+                        )
+                        self.predictor_thread.start()
 
                 # Sleep a bit before checking again
                 time.sleep(2)

@@ -1,3 +1,4 @@
+from typing import override
 import numpy as np
 import json
 import logging
@@ -12,40 +13,41 @@ logger = logging.getLogger("API_VEHICLE_PLATE_TRACKER")
 class VideoVehiclePlateTracker(TrackerInt):
     def __init__(self):
         self.all_predictions: list[Dict[str, Any]] = []
-        self.vehicles: Dict[str, int] = {}
+        self.vehicles: Dict[int, int] = {}
 
-    def update(self, result: dict, frame: np.ndarray, frame_ids: Optional[List[int]] = None):
+    @override
+    def update(self, result: dict[str, Any], frame: np.ndarray[Any, Any], frame_ids: Optional[List[int]] = None):
         """Update current detections and store the prediction results."""
         mot_res = result.get("mot", {}) or {}
-        boxes = mot_res.get("boxes")
+        boxes = mot_res.get("boxes", [])
         plates_list: List[str] = (result.get("vehicleplate", {}) or {}).get("plate", [])
 
         for idx, box in enumerate(boxes):
             if idx < len(plates_list) and plates_list[idx] and plates_list[idx] != "":
-                vehicle_id = box[0]
-                plate = plates_list[idx]
-                score = box[2] * 100
+                vehicle_id: int = box[0]
+                plate: str = plates_list[idx]
+                score: float = box[2] * 100
 
                 if vehicle_id in self.vehicles:
                     v_idx = self.vehicles[vehicle_id]
                     old_plates: List[str] = self.all_predictions[v_idx]["plates"]
                     old_scores: List[float] = self.all_predictions[v_idx]["scores"]
-                    old_best_plates = self.all_predictions[v_idx]["best_plates"]
-                    old_best_scores = self.all_predictions[v_idx]["best_scores"]
+                    old_best_plates: List[str] = self.all_predictions[v_idx]["best_plates"]
+                    old_best_scores: List[float] = self.all_predictions[v_idx]["best_scores"]
 
                     old_plates.append(plate)
                     old_scores.append(score)
 
                     counter = Counter(old_plates)
                     carlp = counter.most_common()
-                    best_plate = None
+                    best_plate: Optional[str] = None
 
                     if len(carlp) > 0:
                         best_plate = carlp[0][0]
 
-                    if best_plate not in old_best_plates:
+                    if best_plate and best_plate not in old_best_plates:
                         old_best_plates.append(best_plate)
-                        max_scores = {}
+                        max_scores: dict[str, float] = {}
                         for p, s in zip(old_plates, old_scores):
                             if p == best_plate and (p not in max_scores or s > max_scores[p]):
                                 max_scores[p] = s
@@ -68,6 +70,7 @@ class VideoVehiclePlateTracker(TrackerInt):
                     })
                     self.vehicles[vehicle_id] = len(self.all_predictions) - 1
 
+    @override
     def reset(self):
         """Reset the scores and predictions."""
         self.all_predictions = []

@@ -4,27 +4,28 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import re
-from fuzzywuzzy import fuzz
-import Levenshtein
+from typing import Any, Dict, List
+from fuzzywuzzy import fuzz  # type: ignore
+import Levenshtein  # type: ignore
 
-def clean_text(text):
+def clean_text(text: Any) -> str:
     """Remove spaces and non-alphanumeric characters, and convert to uppercase."""
     if not text:
         return ""
     return re.sub(r'\W+', '', str(text)).upper()
 
-def evaluate_predictions(ground_truth_file, predictions_file, score_threshold=0.5, 
-                         fuzzy_threshold=80, min_len=4, max_len=12, verbose=True):
+def evaluate_predictions(ground_truth_file: str, predictions_file: str, score_threshold: float = 0.5, 
+                         fuzzy_threshold: int = 80, min_len: int = 4, max_len: int = 12, verbose: bool = True) -> Dict[str, Any]:
     # Load ground truth
     with open(ground_truth_file, 'r') as f:
         gt_data = json.load(f)
     
     # Map ground truth by image basename
-    gt_map = {}
+    gt_map: Dict[str, List[str]] = {}
     for item in gt_data:
         image_name = os.path.basename(item['image'])
         plate_text = item.get('plate_text')
-        texts = []
+        texts: List[str] = []
         if isinstance(plate_text, str):
             if plate_text.strip():
                 texts.append(clean_text(plate_text))
@@ -125,7 +126,7 @@ def evaluate_predictions(ground_truth_file, predictions_file, score_threshold=0.
         'cer': avg_cer
     }
 
-def generate_plots(ground_truth_file, predictions_file, output_dir):
+def generate_plots(ground_truth_file: str, predictions_file: str, output_dir: str) -> None:
     print("Mengevaluasi performa OCR dengan threshold 0.5...")
     evaluate_predictions(ground_truth_file, predictions_file, score_threshold=0.5, verbose=True)
 
@@ -167,3 +168,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     generate_plots(args.ground_truth, args.predictions, args.output_dir)
+

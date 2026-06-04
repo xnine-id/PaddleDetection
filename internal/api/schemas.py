@@ -47,16 +47,12 @@ class AddCameraRequest(BaseModel):
     url: str = Field(description="URL of the camera stream")
     fight_enabled: bool = Field(description="Enable fight detection")
     vehicle_plate_enabled: bool = Field(description="Enable vehicle plate detection")
-    snapshot_enabled: bool = Field(description="Enable snapshot")
-    mqtt_enabled: bool = Field(description="Enable MQTT")
 
 class UpdateCameraRequest(BaseModel):
     name: Optional[str] = Field(None, description="Name of the camera")
     url: Optional[str] = Field(None, description="URL of the camera stream")
     fight_enabled: Optional[bool] = Field(None, description="Enable fight detection")
     vehicle_plate_enabled: Optional[bool] = Field(None, description="Enable vehicle plate detection")
-    snapshot_enabled: Optional[bool] = Field(None, description="Enable snapshot")
-    mqtt_enabled: Optional[bool] = Field(None, description="Enable MQTT")
 
 class CameraResponse(BaseModel):
     id: int
@@ -64,8 +60,6 @@ class CameraResponse(BaseModel):
     url: str
     fight_enabled: bool
     vehicle_plate_enabled: bool
-    snapshot_enabled: bool
-    mqtt_enabled: bool
 
     class Config:
         from_attributes = True
@@ -86,5 +80,5 @@ class TokenResponse(BaseModel):
         from_attributes = True
 
 class GenericResponse(BaseModel):
-    status: str = Field(example="success")
-    message: str = Field(example="Face registered successfully")
+    status: str = Field(examples=["success"])
+    message: str = Field(examples=["Face registered successfully"])

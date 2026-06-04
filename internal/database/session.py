@@ -1,6 +1,6 @@
 import os
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
-from sqlalchemy.orm import sessionmaker
+from typing import Optional, Any
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine, async_sessionmaker
 from internal.database.entity.base import Base
 # Import all entities here to ensure they are registered with Base.metadata
 from internal.database.entity.camera import Camera
@@ -10,15 +10,15 @@ from internal.database.entity.token import Token
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./storage/private/database.db")
 
 # Private variables untuk caching
-_engine: AsyncEngine = None
-_sessionmaker = None
+_engine: Optional[AsyncEngine] = None
+_sessionmaker: Optional[async_sessionmaker[AsyncSession]] = None
 
 def get_engine(url: str = DATABASE_URL) -> AsyncEngine:
     """Lazy load engine: hanya dibuat ketika pertama dipanggil."""
     global _engine
     if _engine is None:
         # Untuk SQLite, kita perlu set check_same_thread=False jika menggunakan multiple threads
-        connect_args = {"check_same_thread": False} if "sqlite" in url else {}
+        connect_args: dict[str, Any] = {"check_same_thread": False} if "sqlite" in url else {}
         _engine = create_async_engine(
             url, 
             echo=True,
@@ -26,13 +26,12 @@ def get_engine(url: str = DATABASE_URL) -> AsyncEngine:
         )
     return _engine
 
-def get_sessionmaker():
+def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
     """Lazy load sessionmaker."""
     global _sessionmaker
     if _sessionmaker is None:
-        _sessionmaker = sessionmaker(
+        _sessionmaker = async_sessionmaker(
             bind=get_engine(),
-            class_=AsyncSession,
             expire_on_commit=False,
         )
     return _sessionmaker

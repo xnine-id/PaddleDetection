@@ -47,14 +47,14 @@ class MQTTServiceInt(ABC):
             logger.error(f"[{self.service_name}] Connection failed: {e}")
             self.client = None
 
-    def _on_connect(self, client, userdata, flags, rc):
+    def _on_connect(self, client: Any, userdata: Any, flags: Any, rc: Any):
         """Handle connection and resubscribe to topics"""
         logger.debug(f"[{self.service_name}] Connected with result code {rc}")
         if self.client:
             self.client.subscribe(f"{self.cmd_prefix}/#")
             logger.info(f"[{self.service_name}] Subscribed to {self.cmd_prefix}/#")
 
-    def _on_message(self, client, userdata, msg):
+    def _on_message(self, client: Any, userdata: Any, msg: Any):
         """Central message dispatcher"""
         try:
             topic = msg.topic
@@ -81,7 +81,7 @@ class MQTTServiceInt(ABC):
         confidence: float,
         snapshot: Optional[str] = None,
         event_type: str = "fight",
-        **kwargs,
+        **kwargs: Any,
     ):
         """Publish detection event"""
         pass

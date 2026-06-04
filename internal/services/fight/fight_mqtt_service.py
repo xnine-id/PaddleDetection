@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Optional, override
 
 from internal.utils.config_loader import MQTTConfig
 from internal.services.base.mqtt_service_int import MQTTServiceInt
@@ -15,6 +15,7 @@ class FightMQTTService(MQTTServiceInt):
     def __init__(self, config: MQTTConfig):
         super().__init__(config, service_name="FightMQTT")
 
+    @override
     def publish_event(
         self,
         event_id: str,
@@ -22,6 +23,7 @@ class FightMQTTService(MQTTServiceInt):
         confidence: float,
         snapshot: Optional[str] = None,
         event_type: str = "fight",
+        **kwargs: Any,
     ):
         if not self.client:
             return

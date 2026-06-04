@@ -1,7 +1,7 @@
 import numpy as np
 import json
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, override
 
 from internal.services.base.tracker_int import TrackerInt
 
@@ -13,9 +13,10 @@ class VideoFightTracker(TrackerInt):
         self.scores: list[int] = []
         self.all_predictions: list[Dict[str, Any]] = []
 
-    def update(self, result: dict, frame: np.ndarray, frame_ids: Optional[List[int]] = None):
+    @override
+    def update(self, result: dict[str, Any], frame: np.ndarray[Any, Any], frame_ids: Optional[List[int]] = None):
         """Update current detections and store the prediction results."""
-        ids_copy = frame_ids.copy() if frame_ids is not None else []
+        ids_copy: List[int] = frame_ids.copy() if frame_ids is not None else []
 
         self.all_predictions.append({
             "class": int(result["class"]),
@@ -43,6 +44,7 @@ class VideoFightTracker(TrackerInt):
         fight_frames = len(self.scores)
         return fight_frames / total_frames
 
+    @override
     def reset(self):
         """Reset the scores and predictions."""
         self.scores = []

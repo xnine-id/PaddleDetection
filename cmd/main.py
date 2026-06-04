@@ -7,6 +7,8 @@ import os
 import argparse
 import signal
 import threading
+import asyncio
+from typing import Any
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -35,11 +37,11 @@ def main():
 
     predictor_wrapper = PredictorWrapper(device=config.system.device)
     manager = CameraManager(predictor_wrapper, config)
-    manager.start()
+    asyncio.run(manager.start())
 
     stop_event = threading.Event()
 
-    def handle_signal(signum, frame):
+    def handle_signal(signum: int, frame: Any) -> None:
         if not stop_event.is_set():
             stop_event.set()
             logger.info(f"Received signal {signum}, shutting down gracefully...")
@@ -61,3 +63,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -24,6 +24,7 @@ import json
 import os
 import re
 import argparse
+from typing import Dict, List, Any, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import (
@@ -42,7 +43,7 @@ from sklearn.metrics import (
 # ─────────────────────────────────────────────
 # 1. LOAD GROUND TRUTH dari Label Studio JSON
 # ─────────────────────────────────────────────
-def load_ground_truth(gt_json_path: str) -> dict:
+def load_ground_truth(gt_json_path: str) -> Dict[int, int]:
     """
     Parse Label Studio export JSON.
     Nama file frame = frame_id video asli (frame_00007.jpg → 7).
@@ -73,7 +74,7 @@ def load_ground_truth(gt_json_path: str) -> dict:
 # ─────────────────────────────────────────────
 # 2. LOAD PREDIKSI dari pipeline output JSON
 # ─────────────────────────────────────────────
-def load_predictions(pred_json_path: str) -> list:
+def load_predictions(pred_json_path: str) -> List[Any]:
     """
     Parse predictions.json dari pipeline PaddleDetection.
     Format: [{class, score, frame_ids: [...]}, ...]
@@ -89,10 +90,10 @@ def load_predictions(pred_json_path: str) -> list:
 # 3. COCOKKAN prediksi clip → GT clip
 # ─────────────────────────────────────────────
 def align_predictions_to_frames(
-    predictions: list,
-    ground_truth: dict,
+    predictions: List[Any],
+    ground_truth: Dict[int, int],
     fight_threshold: int = 3
-) -> tuple:
+) -> Tuple[List[int], List[int], List[float]]:
     """
     Evaluasi per clip (bukan per frame) agar granularitas sama.
 
@@ -104,7 +105,9 @@ def align_predictions_to_frames(
     Args:
         fight_threshold: minimal frame "fight" dalam 1 clip agar clip dianggap fight (default: 3)
     """
-    y_true, y_pred, y_scores = [], [], []
+    y_true: List[int] = []
+    y_pred: List[int] = []
+    y_scores: List[float] = []
     clips_no_gt = 0
 
     for clip in predictions:
@@ -140,7 +143,7 @@ def align_predictions_to_frames(
 # ─────────────────────────────────────────────
 # 4. HITUNG & PRINT METRIK
 # ─────────────────────────────────────────────
-def compute_metrics(y_true, y_pred, y_scores):
+def compute_metrics(y_true: List[int], y_pred: List[int], y_scores: List[float]) -> Tuple[float, float, float, float]:
     precision = precision_score(y_true, y_pred, zero_division=0)
     recall    = recall_score(y_true, y_pred, zero_division=0)
     f1        = f1_score(y_true, y_pred, zero_division=0)
@@ -169,7 +172,7 @@ def compute_metrics(y_true, y_pred, y_scores):
 # ─────────────────────────────────────────────
 # 5. PLOT CONFUSION MATRIX
 # ─────────────────────────────────────────────
-def plot_confusion_matrix(y_true, y_pred, output_dir):
+def plot_confusion_matrix(y_true: List[int], y_pred: List[int], output_dir: str) -> None:
     cm = confusion_matrix(y_true, y_pred)
     disp = ConfusionMatrixDisplay(cm, display_labels=["No Fight", "Fight"])
 
@@ -189,7 +192,7 @@ def plot_confusion_matrix(y_true, y_pred, output_dir):
 # ─────────────────────────────────────────────
 # 6. PLOT PRECISION-RECALL CURVE
 # ─────────────────────────────────────────────
-def plot_pr_curve(y_true, y_scores, mAP, output_dir):
+def plot_pr_curve(y_true: List[int], y_scores: List[float], mAP: float, output_dir: str) -> None:
     prec_curve, rec_curve, _ = precision_recall_curve(y_true, y_scores)
     baseline = sum(y_true) / len(y_true)
 
@@ -204,8 +207,8 @@ def plot_pr_curve(y_true, y_scores, mAP, output_dir):
     ax.set_title("Precision-Recall Curve", fontsize=13, fontweight="bold")
     ax.legend()
     ax.grid(True, alpha=0.3)
-    ax.set_xlim([0, 1])
-    ax.set_ylim([0, 1.05])
+    ax.set_xlim((0.0, 1.0))
+    ax.set_ylim((0.0, 1.05))
 
     plt.tight_layout()
     path = os.path.join(output_dir, "pr_curve.png")
@@ -217,7 +220,7 @@ def plot_pr_curve(y_true, y_scores, mAP, output_dir):
 # ─────────────────────────────────────────────
 # 7. PLOT ROC CURVE
 # ─────────────────────────────────────────────
-def plot_roc_curve(y_true, y_scores, output_dir):
+def plot_roc_curve(y_true: List[int], y_scores: List[float], output_dir: str) -> None:
     fpr, tpr, _ = roc_curve(y_true, y_scores)
     roc_auc = auc(fpr, tpr)
 
@@ -241,7 +244,7 @@ def plot_roc_curve(y_true, y_scores, output_dir):
 # ─────────────────────────────────────────────
 # 8. BUILD FRAME ARRAYS untuk timeline
 # ─────────────────────────────────────────────
-def build_frame_arrays(predictions, ground_truth, video_fps=25):
+def build_frame_arrays(predictions: List[Any], ground_truth: Dict[int, int], video_fps: int = 25) -> Tuple[Any, Any, int]:
     """
     Bangun array GT dan prediksi berindeks frame_id video asli,
     digunakan untuk plot timeline dengan sumbu waktu.
@@ -270,7 +273,7 @@ def build_frame_arrays(predictions, ground_truth, video_fps=25):
 # ─────────────────────────────────────────────
 # 9. HELPER: format detik → "mm:ss"
 # ─────────────────────────────────────────────
-def seconds_to_mmss(seconds):
+def seconds_to_mmss(seconds: float) -> str:
     m = int(seconds) // 60
     s = int(seconds) % 60
     return f"{m:02d}:{s:02d}"
@@ -279,7 +282,7 @@ def seconds_to_mmss(seconds):
 # ─────────────────────────────────────────────
 # 10. PLOT TIMELINE dengan durasi waktu
 # ─────────────────────────────────────────────
-def plot_timeline(gt_array, pred_array, total_frames, video_fps, output_dir):
+def plot_timeline(gt_array: Any, pred_array: Any, total_frames: int, video_fps: int, output_dir: str) -> None:
     # ── Konversi ke waktu (detik) menggunakan frame_id yang tersedia saja ──
     # gt_array dan pred_array berindeks frame_id video asli (0,7,14,21,...)
     # Ambil hanya frame_id yang ada isinya (non-zero) atau semua frame_id kelipatan interval
@@ -296,7 +299,7 @@ def plot_timeline(gt_array, pred_array, total_frames, video_fps, output_dir):
     fig.patch.set_facecolor("#f9f9f9")
 
     # Helper: ekstrak segmen fight dari array + time_axis
-    def get_segments(arr, time_ax):
+    def get_segments(arr: Any, time_ax: Any) -> List[Tuple[float, float]]:
         segments = []
         in_seg, start = False, 0
         for i, val in enumerate(arr):
@@ -312,13 +315,13 @@ def plot_timeline(gt_array, pred_array, total_frames, video_fps, output_dir):
         return segments
 
     # Helper: gambar segmen sebagai bar solid (menghindari garis tipis fill_between)
-    def draw_segments(ax, segments, color, alpha=0.75):
+    def draw_segments(ax: Any, segments: List[Tuple[float, float]], color: str, alpha: float = 0.75) -> None:
         for seg_start, seg_end in segments:
             ax.axvspan(seg_start, seg_end, ymin=0.15, ymax=0.85,
                        color=color, alpha=alpha)
 
     # Helper: annotate timestamp dengan anti-overlap (min_gap detik antar label)
-    def annotate_segments(ax, segments, color, ec, min_gap=4.0):
+    def annotate_segments(ax: Any, segments: List[Tuple[float, float]], color: str, ec: str, min_gap: float = 4.0) -> None:
         last_label_t = -999
         for idx, (seg_start, seg_end) in enumerate(segments):
             mid_t    = (seg_start + seg_end) / 2
@@ -376,7 +379,7 @@ def plot_timeline(gt_array, pred_array, total_frames, video_fps, output_dir):
 
     # ── X-axis: format mm:ss setiap 30 detik ──
     axes[1].set_xlabel("Waktu", fontsize=11, fontweight="bold")
-    axes[1].set_xlim(0, total_seconds)
+    axes[1].set_xlim((0.0, total_seconds))
     tick_positions = np.arange(0, total_seconds + 30, 30)
     axes[1].set_xticks(tick_positions)
     axes[1].set_xticklabels([seconds_to_mmss(t) for t in tick_positions], fontsize=9)
@@ -418,7 +421,7 @@ def plot_timeline(gt_array, pred_array, total_frames, video_fps, output_dir):
 # ─────────────────────────────────────────────
 # 11. SIMPAN SUMMARY ke JSON
 # ─────────────────────────────────────────────
-def save_summary(precision, recall, f1, mAP, y_true, y_pred, output_dir):
+def save_summary(precision: float, recall: float, f1: float, mAP: float, y_true: List[int], y_pred: List[int], output_dir: str) -> None:
     cm = confusion_matrix(y_true, y_pred)
     tn, fp, fn, tp = cm.ravel().tolist()
 
@@ -434,8 +437,8 @@ def save_summary(precision, recall, f1, mAP, y_true, y_pred, output_dir):
             "TN": int(tn), "FN": int(fn),
         },
         "total_frames":    len(y_true),
-        "fight_frames":    int(sum(y_true)),
-        "no_fight_frames": int(len(y_true) - sum(y_true)),
+        "fight_frames":    sum(y_true),
+        "no_fight_frames": len(y_true) - sum(y_true),
     }
     path = os.path.join(output_dir, "evaluation_summary.json")
     with open(path, "w") as f:
