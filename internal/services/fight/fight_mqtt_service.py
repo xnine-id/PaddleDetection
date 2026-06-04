@@ -4,16 +4,16 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from internal.utils.config_loader import MQTTConfig
-from internal.services.mqtt.base.mqtt_service_int import MQTTServiceInt
+from internal.services.base.mqtt_service_int import MQTTServiceInt
 
-logger = logging.getLogger("PlateMQTT")
+logger = logging.getLogger("FightMQTT")
 
 
-class PlateMQTTService(MQTTServiceInt):
-    """MQTT Service for publishing vehicle plate detection events"""
+class FightMQTTService(MQTTServiceInt):
+    """MQTT Service for publishing fight detection events"""
 
     def __init__(self, config: MQTTConfig):
-        super().__init__(config, service_name="PlateMQTT")
+        super().__init__(config, service_name="FightMQTT")
 
     def publish_event(
         self,
@@ -21,7 +21,7 @@ class PlateMQTTService(MQTTServiceInt):
         cam_name: str,
         confidence: float,
         snapshot: Optional[str] = None,
-        event_type: str = "enter",
+        event_type: str = "fight",
         metadata: Optional[Dict[str, Any]] = None,
     ):
         if not self.client:
@@ -33,7 +33,7 @@ class PlateMQTTService(MQTTServiceInt):
             "confidence": round(confidence, 2),
             "timestamp": datetime.now().isoformat(),
             "event": event_type,
-            "snapshot": snapshot,
+            "snapshot": snapshot
         }
 
         if metadata:

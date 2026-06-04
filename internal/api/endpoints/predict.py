@@ -12,9 +12,9 @@ from starlette.concurrency import run_in_threadpool
 
 from internal.constants.infer_name import VEHICLE_PLATE, VIDEO_ACTION
 from internal.core.predictor_wrapper import PredictorWrapper
-from internal.services.trackers.images.images_vehicle_plate_tracker import ImagesVehiclePlateTracker
-from internal.services.trackers.video.video_vehicle_plate_tracker import VideoVehiclePlateTracker
-from internal.services.trackers.video.video_fight_tracker import VideoFightTracker
+from internal.services.vehicle_plate.images_vehicle_plate_tracker import ImagesVehiclePlateTracker
+from internal.services.vehicle_plate.video_vehicle_plate_tracker import VideoVehiclePlateTracker
+from internal.services.fight.video_fight_tracker import VideoFightTracker
 from internal.utils.config_loader import AppConfig
 from internal.api.schemas import JobCreateResponse, JobStatusResponse
 

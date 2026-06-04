@@ -150,10 +150,10 @@ class PredictorWrapper:
 
         return predictor
 
-    def predict_image(self, image_file: str, output_dir: str, trackers: Dict[str, Any]):
+    def predict_image(self, cfg_path: str, image_file: str, output_dir: str, trackers: Dict[str, Any]):
         args = SimpleNamespace(
             # required
-            config=self.cfg_path,
+            config=cfg_path,
             # inputs
             image_file=image_file,
             image_dir=None,

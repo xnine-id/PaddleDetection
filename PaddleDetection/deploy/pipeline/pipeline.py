@@ -665,7 +665,7 @@ class PipePredictor(object):
                         det_res = self.pipeline_res.get('det')
                         img_name = os.path.split(im_file)[-1]
 
-                        vehicleplate_tracker.update({'vehicleplate': vehicleplate_res, 'det': det_res}, img_name)
+                        vehicleplate_tracker.update({'vehicleplate': vehicleplate_res, 'det': det_res, 'image_name': img_name})
 
     def stop(self):
         """Signal to stop prediction and release resources safely"""

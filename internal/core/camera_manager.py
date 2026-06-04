@@ -5,9 +5,9 @@ import logging
 from internal.constants.infer_name import VEHICLE_PLATE, VIDEO_ACTION
 from internal.core.predictor_wrapper import PredictorWrapper
 from internal.core.camera_processor import CameraProcessor
-from internal.services.mqtt.base.mqtt_service_int import MQTTServiceInt
-from internal.services.mqtt.fight_mqtt_service import FightMQTTService
-from internal.services.mqtt.plate_mqtt_service import PlateMQTTService
+from internal.services.base.mqtt_service_int import MQTTServiceInt
+from internal.services.fight.fight_mqtt_service import FightMQTTService
+from internal.services.vehicle_plate.plate_mqtt_service import PlateMQTTService
 from internal.utils.config_loader import AppConfig
 from internal.database.entity.camera import Camera
 

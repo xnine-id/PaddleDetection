@@ -13,10 +13,12 @@ class ImagesVehiclePlateTracker:
     ):
         self.all_predictions: list[Dict[str, Any]] = []
 
-    def update(self, result: dict, image_name: str):
+    def update(self, result: dict):
         det_res = result.get("det", {})
         scores: np.ndarray = det_res["boxes"][:, 1]
         vehicleplate = result.get("vehicleplate", {}).get("vehicleplate", [])
+        image_name = result.get('image_name', '')
+
         self.all_predictions.append(
             {
                 "image_name": image_name,

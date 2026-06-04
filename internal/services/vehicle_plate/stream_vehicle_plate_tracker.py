@@ -10,8 +10,8 @@ from datetime import datetime
 import numpy as np
 
 from internal.constants.infer_name import VEHICLE_PLATE
-from internal.services.trackers.base.tracker_int import TrackerInt
-from internal.services.mqtt.base.mqtt_service_int import MQTTServiceInt
+from internal.services.base.tracker_int import TrackerInt
+from internal.services.base.mqtt_service_int import MQTTServiceInt
 from internal.utils.config_loader import SnapshotConfig
 
 logger = logging.getLogger("VEHICLE_PLATE_TRACKER")

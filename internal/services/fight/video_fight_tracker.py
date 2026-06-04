@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 
-from internal.services.trackers.base.tracker_int import TrackerInt
+from internal.services.base.tracker_int import TrackerInt
 
 logger = logging.getLogger("API_FIGHT_TRACKER")
 

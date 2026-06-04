@@ -8,10 +8,10 @@ from typing import Optional, Dict, Any
 from PaddleDetection.deploy.pipeline.pipeline import PipePredictor
 from internal.constants.infer_name import VEHICLE_PLATE, VIDEO_ACTION
 from internal.core.predictor_wrapper import PredictorWrapper
-from internal.services.mqtt.base.mqtt_service_int import MQTTServiceInt
-from internal.services.trackers.stream.stream_fight_tracker import StreamFightTracker
-from internal.services.trackers.stream.stream_vehicle_plate_tracker import StreamVehiclePlateTracker
-from internal.services.trackers.base.tracker_int import TrackerInt
+from internal.services.base.mqtt_service_int import MQTTServiceInt
+from internal.services.fight.stream_fight_tracker import StreamFightTracker
+from internal.services.vehicle_plate.stream_vehicle_plate_tracker import StreamVehiclePlateTracker
+from internal.services.base.tracker_int import TrackerInt
 from internal.utils.config_loader import DetectionConfig, SystemConfig
 from internal.database.entity.camera import Camera
 

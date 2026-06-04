@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../PaddleDetection/deploy")))
 
 from PaddleDetection.deploy.pipeline.pipe_utils import get_test_images
-from internal.services.trackers.images.images_vehicle_plate_tracker import ImagesVehiclePlateTracker
+from internal.services.vehicle_plate.images_vehicle_plate_tracker import ImagesVehiclePlateTracker
 from internal.constants.infer_name import VEHICLE_PLATE
 from internal.utils.logging_utils import setup_logging
 from internal.utils.config_loader import load_config
@@ -20,12 +20,12 @@ config = load_config("configs/config.yml")
 setup_logging()
 
 predictor_wrapper = PredictorWrapper(
-    cfg_path=config.system.config_path,
     device=config.system.device,
 )
 
 vehicleplate_tracker = ImagesVehiclePlateTracker()
 predictor = predictor_wrapper.predict_images(
+    cfg_path=config.system.config_path,
     image_dir=image_dir,
     output_dir=output_dir+"/imgs",
     trackers={VEHICLE_PLATE: vehicleplate_tracker},

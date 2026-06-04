@@ -33,6 +33,6 @@ async def verify_token(
 
     # Update last_used
     token_obj.last_used = datetime.now()
-    db.commit()
+    await db.commit()
 
     return token_obj
