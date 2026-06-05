@@ -1,3 +1,4 @@
+from networkx.generators import spectral_graph_forge
 import asyncio
 import logging
 import threading
@@ -47,12 +48,17 @@ class CameraProcessor:
         self.detection_config = detection_config
 
         self.cfg_path = self._calculate_cfg_path()
-        self.trackers: Dict[str, TrackerInt] = self._calculate_trackers()
-        self.predictor: Optional[PipePredictor] = self._init_predictor() if self.is_running else None
+        self.trackers: Dict[str, TrackerInt] = {}
+        self.predictor: Optional[PipePredictor] = None
         self.predictor_thread: Optional[threading.Thread] = None
         self._needs_restart = False
 
-        # Register camera with all MQTT services for command handling
+        if self.fight_enabled: self._init_fight_tracker()
+        if self.vehicle_plate_enabled: self._init_vehicle_tracker()
+        if self.is_running: self._init_predictor()
+        self._register_cam_mqtt()
+
+    def _register_cam_mqtt(self):
         for action, service in self.mqtt_services.items():
             is_running = False
             if self.vehicle_plate_enabled and action == VEHICLE_PLATE:
@@ -64,7 +70,7 @@ class CameraProcessor:
             )
 
     def _init_predictor(self):
-        predictor = self.predictor_wrapper.predict_livestream(
+        self.predictor = self.predictor_wrapper.predict_livestream(
             cfg_path=self.cfg_path,
             cam_name=self.cam_name,
             rtsp_url=self.url,
@@ -72,26 +78,15 @@ class CameraProcessor:
             trackers=self.trackers,
         )
 
-        return predictor
-
-    def _calculate_trackers(self):
-        trackers: Dict[str, TrackerInt] = {}
-        if self.fight_enabled:
-            trackers[VIDEO_ACTION] = self._init_fight_tracker()
-        if self.vehicle_plate_enabled:
-            trackers[VEHICLE_PLATE] = self._init_vehicle_tracker()
-
-        return trackers
-
     def _init_vehicle_tracker(self):
-        return StreamVehiclePlateTracker(
+        self.trackers[VEHICLE_PLATE] = StreamVehiclePlateTracker(
             snapshot_config=self.detection_config.vehicle_plate.snapshot,
             cam_name=self.cam_name,
             mqtt_service=self.mqtt_services.get(VEHICLE_PLATE),
         )
 
     def _init_fight_tracker(self):
-        return StreamFightTracker(
+        self.trackers[VIDEO_ACTION] = StreamFightTracker(
             snapshot_config=self.detection_config.fight.snapshot,
             cam_name=self.cam_name,
             mqtt_service=self.mqtt_services.get(VIDEO_ACTION),
@@ -145,14 +140,16 @@ class CameraProcessor:
                         self.predictor_thread.join(timeout=2)
                 
                 if self.is_running:
-                    self.predictor = self._init_predictor()
-                    self.predictor.last_update_time = time.time()
-                    self.predictor_thread = threading.Thread(
-                        target=self.predictor.run,
-                        args=(self.url, self.thread_idx),
-                        daemon=True,
-                    )
-                    self.predictor_thread.start()
+                    self._init_predictor()
+
+                    if self.predictor is not None:
+                        self.predictor.last_update_time = time.time()
+                        self.predictor_thread = threading.Thread(
+                            target=self.predictor.run,
+                            args=(self.url, self.thread_idx),
+                            daemon=True,
+                        )
+                        self.predictor_thread.start()
                 else:
                     self.predictor_thread = None
 
@@ -214,12 +211,23 @@ class CameraProcessor:
             else:
                 # If we are not supposed to be running, but thread is still alive,
                 # we just wait for it to die (it should die if stream is closed or predictor returns)
-                if self.predictor_thread is not None:
-                    if self.predictor_thread.is_alive():
-                        if self.predictor:
-                            self.predictor.stop()
-                        self.predictor_thread.join(timeout=2)
+                if self.predictor_thread is None:
+                    time.sleep(1)
+                    continue
+
+                # Guard 2: Jika thread sudah mati, reset ke None lalu skip
+                if not self.predictor_thread.is_alive():
                     self.predictor_thread = None
+                    time.sleep(1)
+                    continue
+
+                # Logika Utama: Berjalan jika thread ADA dan ALIVE
+                if self.predictor:
+                    self.predictor.stop()
+
+                self.predictor_thread.join(timeout=2)
+                self.predictor_thread = None
+
                 time.sleep(1)
 
         logger.info(f"[{self.cam_name}] Main loop stopped")
@@ -229,13 +237,14 @@ class CameraProcessor:
 
         if action == VIDEO_ACTION:
             self.fight_enabled = True
+
+            if not action in self.trackers:
+                self._init_fight_tracker()
         elif action == VEHICLE_PLATE:
             self.vehicle_plate_enabled = True
 
-        if action == VIDEO_ACTION and not action in self.trackers:
-            self.trackers[action] = self._init_fight_tracker()
-        elif action == VEHICLE_PLATE and not action in self.trackers:
-            self.trackers[action] = self._init_vehicle_tracker()
+            if not action in self.trackers:
+                self._init_vehicle_tracker()
 
         self.cfg_path = self._calculate_cfg_path()
         self.is_running = True
@@ -247,7 +256,7 @@ class CameraProcessor:
             service.publish_state(self.cam_name, True)
 
         threading.Thread(
-            target=lambda: asyncio.run(self._persist_action_flag(action, True)),
+            target=lambda: asyncio.run(self._update_db_enabled(action, True)),
             daemon=True,
         ).start()
 
@@ -280,7 +289,7 @@ class CameraProcessor:
             service.publish_state(self.cam_name, False)
 
         threading.Thread(
-            target=lambda: asyncio.run(self._persist_action_flag(action, False)),
+            target=lambda: asyncio.run(self._update_db_enabled(action, False)),
             daemon=True,
         ).start()
 
@@ -296,7 +305,7 @@ class CameraProcessor:
 
         logger.info(f"[{self.cam_name}] Status changed to STOPPED")
 
-    async def _persist_action_flag(self, action: str, enabled: bool):
+    async def _update_db_enabled(self, action: str, enabled: bool):
         """Persist fight_enabled or vehicle_plate_enabled to the database."""
         from internal.database.session import get_sessionmaker
         from sqlalchemy.future import select
