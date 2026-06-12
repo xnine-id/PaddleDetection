@@ -312,6 +312,6 @@ def get_predict_router(config: AppConfig, predictor_wrapper: PredictorWrapper):
             raise HTTPException(status_code=404, detail="File not found")
 
         mime_type, _ = mimetypes.guess_type(requested_path)
-        return FileResponse(requested_path, media_type=mime_type or "application/octet-stream", filename=filename)
+        return FileResponse(requested_path, media_type=mime_type or "application/octet-stream")
 
     return router

@@ -12,7 +12,7 @@ def create_router(config: AppConfig, camera_manager: CameraManager, predictor_wr
 
     # Include sub-routers
     router.include_router(get_camera_router(camera_manager))
-    router.include_router(get_media_router(config))
+    router.include_router(get_media_router(config.detection))
     router.include_router(get_predict_router(config, predictor_wrapper))
     router.include_router(get_system_router())
 

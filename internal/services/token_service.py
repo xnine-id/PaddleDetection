@@ -11,14 +11,14 @@ class TokenService:
     def _generate_api_key(self):
         return secrets.token_hex(16)
 
-    async def create_token(self, data: GenerateApiKeyRequest, is_admin: bool = False):
+    async def create_token(self, data: GenerateApiKeyRequest):
         new_api_key = self._generate_api_key()
         new_token = Token(
             name=data.name,
             token=new_api_key,
             expires_at=data.expires_at,
             is_active=True,
-            is_admin=is_admin
+            is_admin=data.is_admin
         )
         self.session.add(new_token)
         await self.session.commit()

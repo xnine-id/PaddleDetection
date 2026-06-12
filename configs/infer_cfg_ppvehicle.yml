@@ -11,7 +11,7 @@ MOT:
   tracker_config: PaddleDetection/deploy/pipeline/config/tracker_config.yml
   batch_size: 1
   skip_frame_num: 3 # preferably no more than 3
-  enable: False
+  enable: True
 
 VEHICLE_PLATE:
   det_model_dir: https://bj.bcebos.com/v1/paddledet/models/pipeline/ch_PP-OCRv3_det_infer.tar.gz

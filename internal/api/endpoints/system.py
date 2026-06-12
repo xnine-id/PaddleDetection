@@ -1,3 +1,4 @@
+from internal.api.middleware.auth import verify_admin_token
 from internal.api.schemas import GenerateApiKeyRequest, TokenResponse
 from internal.database.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +18,7 @@ def get_system_router():
     async def health_check():
         return {"status": "ok", "message": "API is running"}
 
-    @router.post("/generate-api-key", dependencies=[Depends(verify_token)])
+    @router.post("/generate-api-key", dependencies=[Depends(verify_admin_token)])
     async def generate_api_key(
         request: GenerateApiKeyRequest,
         token_service: TokenService = Depends(get_token_service),
@@ -26,11 +27,11 @@ def get_system_router():
 
         return {"status": "success", "message": "API key generated successfully", "token": token.token}
 
-    @router.get("/tokens", response_model=List[TokenResponse], dependencies=[Depends(verify_token)])
+    @router.get("/tokens", response_model=List[TokenResponse], dependencies=[Depends(verify_admin_token)])
     async def list_tokens(token_service: TokenService = Depends(get_token_service)):
         return await token_service.list_tokens()
 
-    @router.patch("/tokens/{token_id}/toggle", dependencies=[Depends(verify_token)])
+    @router.patch("/tokens/{token_id}/toggle", dependencies=[Depends(verify_admin_token)])
     async def toggle_token(
         token_id: int,
         is_active: bool,
@@ -41,7 +42,7 @@ def get_system_router():
             raise HTTPException(status_code=404, detail="Token not found")
         return {"status": "success", "message": f"Token {'activated' if is_active else 'deactivated'}"}
 
-    @router.delete("/tokens/{token_id}", dependencies=[Depends(verify_token)])
+    @router.delete("/tokens/{token_id}", dependencies=[Depends(verify_admin_token)])
     async def delete_token(
         token_id: int,
         token_service: TokenService = Depends(get_token_service)

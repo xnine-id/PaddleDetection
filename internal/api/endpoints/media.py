@@ -1,23 +1,19 @@
 import os
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
+from internal.utils.config_loader import DetectionConfig
 from internal.api.middleware.auth import verify_token
-from internal.utils.config_loader import AppConfig
 from internal.constants.infer_name import VEHICLE_PLATE, VIDEO_ACTION
 
-def get_media_router(config: AppConfig):
-    router = APIRouter(tags=["Media"])
+def get_media_router(config: DetectionConfig):
+    router = APIRouter(tags=["Media"], dependencies=[Depends(verify_token)])
 
     snapshot_dirs = {
-        VIDEO_ACTION: config.detection.fight.snapshot.output_dir,
-        VEHICLE_PLATE: config.detection.vehicle_plate.snapshot.output_dir,
+        VIDEO_ACTION: config.fight.snapshot.output_dir,
+        VEHICLE_PLATE: config.vehicle_plate.snapshot.output_dir,
     }
 
-    @router.get(
-        "/snapshots/{action}/{date_str}/{filename}",
-        summary="Get snapshot image file",
-        dependencies=[Depends(verify_token)]
-    )
+    @router.get("/snapshots/{action}/{date_str}/{filename}", summary="Get snapshot image file")
     async def get_snapshot(action: str, date_str: str, filename: str):
         """
         Get snapshot image by date and filename.

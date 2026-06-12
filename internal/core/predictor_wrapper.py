@@ -13,7 +13,7 @@ class PredictorWrapper:
     livestream (RTSP) or static video file predictions.
     """
     def __init__(self, device: str):
-        self.device = device
+        self.device = device.upper()
         print("================== paddle run check ========================")
         paddle.utils.run_check()
         print("================== paddle run check ========================")
@@ -35,7 +35,7 @@ class PredictorWrapper:
             output_dir="output",
             pushurl=pushurl_prefix,
             run_mode="paddle",
-            device=self.device.upper(),
+            device=self.device,
             enable_mkldnn=False,
             cpu_threads=1,
             trt_min_shape=1,
@@ -79,7 +79,7 @@ class PredictorWrapper:
             output_dir=output_dir,
             pushurl=[],
             run_mode="paddle",
-            device=self.device.upper(),
+            device=self.device,
             enable_mkldnn=False,
             cpu_threads=1,
             trt_min_shape=1,
@@ -123,7 +123,7 @@ class PredictorWrapper:
             output_dir=output_dir,
             pushurl=[],
             run_mode="paddle",
-            device=self.device.upper(),
+            device=self.device,
             enable_mkldnn=False,
             cpu_threads=1,
             trt_min_shape=1,
@@ -165,7 +165,7 @@ class PredictorWrapper:
             output_dir=output_dir,
             pushurl=[],
             run_mode="paddle",
-            device=self.device.upper(),
+            device=self.device,
             enable_mkldnn=False,
             cpu_threads=1,
             trt_min_shape=1,

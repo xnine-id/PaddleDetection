@@ -36,3 +36,8 @@ async def verify_token(
     await db.commit()
 
     return token_obj
+
+async def verify_admin_token(token_obj: Token = Depends(verify_token)):
+    if not token_obj.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return token_obj

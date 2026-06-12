@@ -67,6 +67,7 @@ class CameraResponse(BaseModel):
 class GenerateApiKeyRequest(BaseModel):
     name: str = Field(description="Name of the API key")
     expires_at: Optional[datetime] = Field(None, description="Expiration date of the API key")
+    is_admin: bool = Field(False, description="Whether the API key has admin privileges")
 
 class TokenResponse(BaseModel):
     id: int
