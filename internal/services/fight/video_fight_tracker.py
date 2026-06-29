@@ -14,9 +14,9 @@ class VideoFightTracker(TrackerInt):
         self.all_predictions: list[Dict[str, Any]] = []
 
     @override
-    def update(self, result: dict[str, Any], frame: np.ndarray[Any, Any], frame_ids: Optional[List[int]] = None):
+    def update(self, result: dict[str, Any], frame: np.ndarray[Any, Any], frame_ids: List[int]):
         """Update current detections and store the prediction results."""
-        ids_copy: List[int] = frame_ids.copy() if frame_ids is not None else []
+        ids_copy: List[int] = frame_ids.copy()
 
         self.all_predictions.append({
             "class": int(result["class"]),

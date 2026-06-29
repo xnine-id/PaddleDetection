@@ -1,7 +1,8 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import Any, Callable, Dict, Optional
+from typing_extensions import override
 
 from internal.utils.config_loader import MQTTConfig
 from internal.services.base.mqtt_service_int import MQTTServiceInt
@@ -12,8 +13,8 @@ logger = logging.getLogger("FightMQTT")
 class FightMQTTService(MQTTServiceInt):
     """MQTT Service for publishing fight detection events"""
 
-    def __init__(self, config: MQTTConfig):
-        super().__init__(config, service_name="FightMQTT")
+    def __init__(self, config: MQTTConfig, command_callback: Callable[[str, str, Dict[str, Any]], None]):
+        super().__init__(config, command_callback, service_name="FightMQTT")
 
     @override
     def publish_event(

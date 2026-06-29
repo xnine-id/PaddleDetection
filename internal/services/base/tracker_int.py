@@ -1,7 +1,7 @@
 from typing import Any
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import List
 
 
 class TrackerInt(ABC):
@@ -11,7 +11,7 @@ class TrackerInt(ABC):
     and handling heartbeats for health checks.
     """
     @abstractmethod
-    def update(self, result: dict[str, Any], frame: np.ndarray[Any, Any], frame_ids: Optional[List[int]] = None):
+    def update(self, result: dict[str, Any], frame: np.ndarray[Any, Any], frame_ids: List[int]):
         """Update tracker with the latest detection result."""
         pass
 

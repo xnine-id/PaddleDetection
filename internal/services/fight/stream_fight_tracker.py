@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 import numpy as np
 
-from internal.constants.infer_name import VIDEO_ACTION
+from internal.constants.predict_action import PredictAction
 from internal.services.base.tracker_int import TrackerInt
 from internal.services.base.mqtt_service_int import MQTTServiceInt
 from internal.utils.config_loader import SnapshotConfig
@@ -34,7 +34,7 @@ class StreamFightTracker(TrackerInt):
 
     @override
     def update(
-        self, result: dict[str, Any], frame: np.ndarray[Any, Any], frame_ids: Optional[List[int]] = None
+        self, result: dict[str, Any], frame: np.ndarray[Any, Any], frame_ids: List[int]
     ):
         """
         Update current detections and check for fight events.
@@ -110,4 +110,4 @@ class StreamFightTracker(TrackerInt):
             return None
 
         # Return path immediately (predicted path)
-        return f"/snapshots/{VIDEO_ACTION}/{today}/{self.cam_name}_{timestamp}.jpg"
+        return f"/snapshots/{PredictAction.VIDEO_ACTION}/{today}/{self.cam_name}_{timestamp}.jpg"

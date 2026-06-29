@@ -11,6 +11,10 @@ class JobCreateResponse(BaseModel):
     message: str = Field(..., description="Status message")
     data: JobData
 
+class FightDetail(BaseModel):
+    start_time: float = Field(..., description="Start time of the fight")
+    end_time: float = Field(..., description="End time of the fight")
+    score: float = Field(..., description="Fight score")
 
 class FightResult(BaseModel):
     fight_detected: bool = Field(..., description="Fight detected")
@@ -18,18 +22,24 @@ class FightResult(BaseModel):
     min_score: float = Field(..., description="Minimum score")
     avg_score: float = Field(..., description="Average score")
     fight_frequency: float = Field(..., description="Fight frequency")
-
+    details: List[FightDetail] = Field(..., description="Details of each fight")
 
 class VehiclePlateDetail(BaseModel):
     vehicle_id: int = Field(..., description="Vehicle ID")
     plates: List[str] = Field(..., description="List of plates")
     scores: List[float] = Field(..., description="List of scores")
 
+class VehiclePlateResult(BaseModel):
+    total_vehicles: int = Field(..., description="Total vehicles")
+    avg_plate_count_per_vehicle: float = Field(..., description="Average plate count per vehicle")
+    avg_vehicle_plate_score: float = Field(..., description="Average vehicle plate score")
+    total_plates: int = Field(..., description="Total plates")
+    details: List[VehiclePlateDetail] = Field(..., description="Details of each vehicle")
 
 class JobResult(BaseModel):
     filename: str = Field(..., description="Filename")
     url: str = Field(..., description="URL to the result file")
-    detections: Optional[Union[FightResult, List[VehiclePlateDetail]]] = Field(None, description="Detections")
+    detections: Optional[Union[FightResult, VehiclePlateResult]] = Field(None, description="Detections")
 
 
 class JobStatusData(BaseModel):

@@ -16,7 +16,7 @@ class VideoVehiclePlateTracker(TrackerInt):
         self.vehicles: Dict[int, int] = {}
 
     @override
-    def update(self, result: dict[str, Any], frame: np.ndarray[Any, Any], frame_ids: Optional[List[int]] = None):
+    def update(self, result: dict[str, Any], frame: np.ndarray[Any, Any], frame_ids: List[int]):
         """Update current detections and store the prediction results."""
         mot_res = result.get("mot", {}) or {}
         boxes = mot_res.get("boxes", [])
@@ -59,6 +59,7 @@ class VideoVehiclePlateTracker(TrackerInt):
                         "scores": old_scores,
                         "best_plates": old_best_plates,
                         "best_scores": old_best_scores,
+                        "frame_id": frame_ids[0],
                     }
                 else:
                     self.all_predictions.append({
@@ -67,6 +68,7 @@ class VideoVehiclePlateTracker(TrackerInt):
                         "scores": [score],
                         "best_plates": [plate],
                         "best_scores": [score],
+                        "frame_id": frame_ids[0],
                     })
                     self.vehicles[vehicle_id] = len(self.all_predictions) - 1
 

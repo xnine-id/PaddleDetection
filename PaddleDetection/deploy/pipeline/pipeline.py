@@ -1177,7 +1177,7 @@ class PipePredictor(object):
                 if (vehicleplate_tracker is not None and not is_mot_null):
                     vehicleplate_res = self.pipeline_res.get('vehicleplate')
                     mot_res = self.pipeline_res.get('mot')
-                    vehicleplate_tracker.update({'vehicleplate': vehicleplate_res, 'mot': mot_res}, im)
+                    vehicleplate_tracker.update({'vehicleplate': vehicleplate_res, 'mot': mot_res}, im, [frame_id-1])
 
                 if len(self.pushurl) > 0:
                     try:

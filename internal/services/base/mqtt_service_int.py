@@ -2,7 +2,7 @@ import json
 import os
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional, Any, Dict
+from typing import Callable, Optional, Any, Dict
 from paho.mqtt import client as mqtt
 
 from internal.utils.config_loader import MQTTConfig
@@ -11,7 +11,7 @@ logger = logging.getLogger("MQTTService")
 
 
 class MQTTServiceInt(ABC):
-    def __init__(self, config: MQTTConfig, service_name: str = "MQTT"):
+    def __init__(self, config: MQTTConfig, command_callback: Callable[[str, str, Dict[str, Any]], None], service_name: str = "MQTT"):
         self.config = config
         self.service_name = service_name
         self.enabled = config.enabled
@@ -20,7 +20,7 @@ class MQTTServiceInt(ABC):
         self.state_prefix = config.state_topic_prefix
 
         self.client: Optional[mqtt.Client] = None
-        self.command_callbacks: Dict[str, Any] = {}
+        self.command_callback = command_callback
 
         if self.enabled:
             self._setup_client()
@@ -62,16 +62,9 @@ class MQTTServiceInt(ABC):
 
             if topic.startswith(self.cmd_prefix):
                 cam_name = topic.replace(f"{self.cmd_prefix}/", "")
-                if cam_name in self.command_callbacks:
-                    self.command_callbacks[cam_name](topic, payload)
+                self.command_callback(cam_name, topic, payload)
         except Exception as e:
             logger.error(f"[{self.service_name}] Error handling message on {msg.topic}: {e}")
-
-    def register_camera(self, cam_name: str, state: bool, on_command_callback: Any):
-        """Register a camera for commands and initial state"""
-        self.command_callbacks[cam_name] = on_command_callback
-        if self.client:
-            self.publish_state(cam_name, state)
 
     @abstractmethod
     def publish_event(
