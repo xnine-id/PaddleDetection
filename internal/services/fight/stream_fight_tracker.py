@@ -1,7 +1,8 @@
+from typing_extensions import override
 import logging
 import cv2
 import uuid
-from typing import Optional, List, Any, override
+from typing import Optional, List, Any
 import threading
 import os
 from datetime import datetime

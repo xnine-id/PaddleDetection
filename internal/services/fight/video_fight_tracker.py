@@ -1,7 +1,8 @@
+from typing_extensions import override
 import numpy as np
 import json
 import logging
-from typing import Dict, Any, List, Optional, override
+from typing import Dict, Any, List
 
 from internal.services.base.tracker_int import TrackerInt
 
