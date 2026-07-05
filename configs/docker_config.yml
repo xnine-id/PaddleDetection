@@ -1,15 +1,15 @@
 system:
-  config_path: "/app/configs/infer_cfg_combine.yml"
+  config_path: "${PROJECT_ROOT}/configs/infer_cfg_combine.yml"
   device: gpu
-  output_dir: '/app/storage/private/output'
+  output_dir: '${PROJECT_ROOT}/storage/private/output'
   pushurl_prefix: rtsp://mediamtx:8554/paddle
 
 detection:
   fight:
-    config_path: "/app/configs/infer_cfg_pphuman.yml"
+    config_path: "${PROJECT_ROOT}/configs/infer_cfg_pphuman.yml"
     snapshot:
       enabled: true
-      output_dir: '/app/storage/private/snapshots/fight'
+      output_dir: '${PROJECT_ROOT}/storage/private/snapshots/fight'
     mqtt:
       enabled: true
       event_topic_prefix: "fight_detection/events" # publish fight event
@@ -17,10 +17,10 @@ detection:
       state_topic_prefix: "fight_detection/state" # camera state. ex: fight_detection/state/webcam1 true
 
   vehicle_plate:
-    config_path: "/app/configs/infer_cfg_ppvehicle.yml"
+    config_path: "${PROJECT_ROOT}/configs/infer_cfg_ppvehicle.yml"
     snapshot:
       enabled: true
-      output_dir: '/app/storage/private/snapshots/vehicle_plate'
+      output_dir: '${PROJECT_ROOT}/storage/private/snapshots/vehicle_plate'
     mqtt:
       enabled: true
       event_topic_prefix: "vehicle_plate_detection/events" # publish vehicle plate event

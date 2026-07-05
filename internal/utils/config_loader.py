@@ -94,6 +94,16 @@ REQUIRED_CONFIG = {
     },
 }
 
+def _expand_project_root(obj: Any, project_root: str) -> Any:
+    """Recursively replace '${PROJECT_ROOT}' placeholders in all string values."""
+    if isinstance(obj, dict):
+        return {k: _expand_project_root(v, project_root) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_expand_project_root(v, project_root) for v in obj]
+    if isinstance(obj, str):
+        return obj.replace("${PROJECT_ROOT}", project_root)
+    return obj
+
 
 def _create_detection_module_config(
     module_dict: Dict[str, Any],
@@ -108,17 +118,28 @@ def _create_detection_module_config(
 
 def load_config(config_file: str) -> AppConfig:
     """Load and validate configuration from YAML file"""
-    config_path = os.path.join(os.path.dirname(__file__), "..", "..", config_file)
+    # Accept either an absolute path or a path relative to the project root.
+    # The project root is two directories above this file (src/utils/ -> project/).
+    if not os.path.isabs(config_file):
+        config_file = os.path.join(
+            os.path.dirname(__file__), "..", "..", config_file
+        )
+    config_path = os.path.realpath(config_file)
+    project_root = os.path.dirname(os.path.dirname(config_path))  # configs/ -> project/
+
     with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-        validate_config(config, REQUIRED_CONFIG)
+        config_dict = yaml.safe_load(f)
+
+    # Expand ${PROJECT_ROOT} placeholders before validation
+    config_dict = _expand_project_root(config_dict, project_root)
+    validate_config(config_dict, REQUIRED_CONFIG)
 
     return AppConfig(
-        system=SystemConfig(**config["system"]),
+        system=SystemConfig(**config_dict["system"]),
         detection=DetectionConfig(
-            fight=_create_detection_module_config(config["detection"]["fight"]),
+            fight=_create_detection_module_config(config_dict["detection"]["fight"]),
             vehicle_plate=_create_detection_module_config(
-                config["detection"]["vehicle_plate"]
+                config_dict["detection"]["vehicle_plate"]
             ),
         ),
     )
