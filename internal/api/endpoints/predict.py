@@ -229,6 +229,7 @@ def get_predict_router(config: AppConfig, predictor_wrapper: PredictorWrapper):
             total_vehicles = len(details)
             total_plates = sum(len(d["plates"]) for d in details)
             avg_plate_count = total_plates / total_vehicles if total_vehicles else 0.0
+            avg_plate_score = sum(sum(p["scores"]) for p in details) / total_plates
 
             jobs[job_id]["status"] = "completed"
             jobs[job_id]["result"] = {
@@ -236,8 +237,8 @@ def get_predict_router(config: AppConfig, predictor_wrapper: PredictorWrapper):
                 "url": f"/api/result/{output_filename}",
                 "detections": {
                     "total_vehicles": total_vehicles,
-                    "avg_vehicle_same_time": 1.0,
                     "avg_plate_count_per_vehicle": avg_plate_count,
+                    "avg_vehicle_plate_score": avg_plate_score,
                     "total_plates": total_plates,
                     "details": details,
                 },
